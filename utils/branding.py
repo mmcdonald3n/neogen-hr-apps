@@ -32,30 +32,40 @@ def _read_version() -> str:
     except Exception:
         return ""
 
-def header(title: str, kicker: str = "Neogen HR Suite", logo_height: int = 40):
+def header(title: str, kicker: str = "Neogen HR Suite", logo_height: int = 44):
     logo_path = _find_logo_file()
     if logo_path:
         logo_html = f'<img src="{_logo_data_uri(logo_path)}" alt="Neogen" style="height:{logo_height}px;width:auto;display:block;" />'
     else:
         logo_html = '<div style="width:140px;height:40px;background:#0072CE;border-radius:8px"></div>'
 
-    # Single HTML block so the logo sits *right next to* the badge reliably
+    # Title row with logo on the RIGHT
     st.markdown(
         f"""
-        <div style="display:flex;align-items:center;gap:12px;margin:0 0 8px 0;">
-            {logo_html}
-            <div class="neogen-badge">{kicker}</div>
+        <style>
+        .neogen-header-row {{ display:flex; align-items:center; justify-content:space-between; gap:16px; }}
+        .neogen-header-row h1 {{ margin:0; line-height:1.2; }}
+        @media (max-width: 720px) {{
+          .neogen-header-row {{ flex-direction:column; align-items:flex-start; gap:8px; }}
+          .neogen-header-row img {{ height:32px; }}
+        }}
+        </style>
+        <div class="neogen-header-row">
+          <h1>{title}</h1>
+          {logo_html}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin:6px 0 0;">
+          <div class="neogen-badge">{kicker}</div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.title(title)
     st.caption("Consistent, fast, and high-quality HR workflows.")
     ver = _read_version()
     if ver:
         st.caption(ver)
-    # keep this one line until we confirm, then we can remove it
+    # (Temporary) keep this until you confirm the placement; we can remove later.
     st.caption(f"Logo: {'found '+str(logo_path) if logo_path else 'not found in assets/'}")
 
 def sidebar_model_controls():
