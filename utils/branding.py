@@ -1,29 +1,31 @@
 ﻿import streamlit as st
 from pathlib import Path
 from urllib.parse import quote
+import base64, mimetypes
 
 def _find_logo_file() -> Path | None:
     repo_root = Path(__file__).resolve().parents[1]
-    candidates_dirs = [Path.cwd(), repo_root]
+    search_dirs = [Path.cwd(), repo_root]
     names = ["neogen_logo", "logo"]
-    raster = [".png", ".jpg", ".jpeg", ".webp", ".gif"]
-    vector = [".svg"]
-    for base in candidates_dirs:
+    exts  = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]
+    for d in search_dirs:
         for n in names:
-            for ext in raster:
-                p = base / "assets" / f"{n}{ext}"
-                if p.exists(): return p
-    for base in candidates_dirs:
-        for n in names:
-            for ext in vector:
-                p = base / "assets" / f"{n}{ext}"
-                if p.exists(): return p
+            for ext in exts:
+                p = d / "assets" / f"{n}{ext}"
+                if p.exists():
+                    return p
     return None
 
-def _svg_html(p: Path, width_px: int) -> str:
-    data = p.read_text(encoding="utf-8")
-    uri = "data:image/svg+xml;utf8," + quote(data)
-    return f'<img src="{uri}" alt="Neogen" style="width:{width_px}px; display:block;" />'
+def _logo_html_inline(p: Path, height_px: int = 40) -> str:
+    if p.suffix.lower() == ".svg":
+        data = p.read_text(encoding="utf-8")
+        uri  = "data:image/svg+xml;utf8," + quote(data)
+        return f'<img src="{uri}" alt="Neogen" style="height:{height_px}px;display:block;" />'
+    mime, _ = mimetypes.guess_type(p.name)
+    if not mime:
+        mime = "image/png"
+    b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+    return f'<img src="data:{mime};base64,{b64}" alt="Neogen" style="height:{height_px}px;display:block;" />'
 
 def _read_version() -> str:
     try:
@@ -31,14 +33,12 @@ def _read_version() -> str:
     except Exception:
         return ""
 
-def header(title: str, kicker: str = "Neogen HR Suite", logo_width: int = 140):
+def header(title: str, kicker: str = "Neogen HR Suite", logo_height: int = 40):
     c1, c2 = st.columns([1, 9], gap="small")
     logo_path = _find_logo_file()
     with c1:
-        if logo_path and logo_path.suffix.lower() != ".svg":
-            st.image(str(logo_path), width=logo_width)
-        elif logo_path:
-            st.markdown(_svg_html(logo_path, logo_width), unsafe_allow_html=True)
+        if logo_path:
+            st.markdown(_logo_html_inline(logo_path, logo_height), unsafe_allow_html=True)
         else:
             st.markdown('<div style="width:140px;height:40px;background:#0072CE;border-radius:8px"></div>', unsafe_allow_html=True)
     with c2:
@@ -48,7 +48,9 @@ def header(title: str, kicker: str = "Neogen HR Suite", logo_width: int = 140):
     st.caption("Consistent, fast, and high-quality HR workflows.")
     ver = _read_version()
     if ver:
-        st.caption(ver)
+        st.caption(ver)  # build banner
+    # temporary debug so we can see what happened
+    st.caption(f"Logo: {'found ' + str(logo_path) if logo_path else 'not found in assets/'}")
 
 def sidebar_model_controls():
     st.sidebar.markdown("### Model Settings")
