@@ -16,16 +16,15 @@ def _find_logo_file() -> Path | None:
                     return p
     return None
 
-def _logo_html_inline(p: Path, height_px: int = 40) -> str:
+def _logo_data_uri(p: Path) -> str:
     if p.suffix.lower() == ".svg":
         data = p.read_text(encoding="utf-8")
-        uri  = "data:image/svg+xml;utf8," + quote(data)
-        return f'<img src="{uri}" alt="Neogen" style="height:{height_px}px;display:block;" />'
+        return "data:image/svg+xml;utf8," + quote(data)
     mime, _ = mimetypes.guess_type(p.name)
     if not mime:
         mime = "image/png"
     b64 = base64.b64encode(p.read_bytes()).decode("ascii")
-    return f'<img src="data:{mime};base64,{b64}" alt="Neogen" style="height:{height_px}px;display:block;" />'
+    return f"data:{mime};base64,{b64}"
 
 def _read_version() -> str:
     try:
@@ -34,23 +33,30 @@ def _read_version() -> str:
         return ""
 
 def header(title: str, kicker: str = "Neogen HR Suite", logo_height: int = 40):
-    c1, c2 = st.columns([1, 9], gap="small")
     logo_path = _find_logo_file()
-    with c1:
-        if logo_path:
-            st.markdown(_logo_html_inline(logo_path, logo_height), unsafe_allow_html=True)
-        else:
-            st.markdown('<div style="width:140px;height:40px;background:#0072CE;border-radius:8px"></div>', unsafe_allow_html=True)
-    with c2:
-        st.markdown(f'<div class="neogen-badge">{kicker}</div>', unsafe_allow_html=True)
+    if logo_path:
+        logo_html = f'<img src="{_logo_data_uri(logo_path)}" alt="Neogen" style="height:{logo_height}px;width:auto;display:block;" />'
+    else:
+        logo_html = '<div style="width:140px;height:40px;background:#0072CE;border-radius:8px"></div>'
+
+    # Single HTML block so the logo sits *right next to* the badge reliably
+    st.markdown(
+        f"""
+        <div style="display:flex;align-items:center;gap:12px;margin:0 0 8px 0;">
+            {logo_html}
+            <div class="neogen-badge">{kicker}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.title(title)
     st.caption("Consistent, fast, and high-quality HR workflows.")
     ver = _read_version()
     if ver:
-        st.caption(ver)  # build banner
-    # temporary debug so we can see what happened
-    st.caption(f"Logo: {'found ' + str(logo_path) if logo_path else 'not found in assets/'}")
+        st.caption(ver)
+    # keep this one line until we confirm, then we can remove it
+    st.caption(f"Logo: {'found '+str(logo_path) if logo_path else 'not found in assets/'}")
 
 def sidebar_model_controls():
     st.sidebar.markdown("### Model Settings")
