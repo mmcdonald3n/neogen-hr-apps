@@ -3,39 +3,44 @@ from pathlib import Path
 import base64
 from urllib.parse import quote
 
-def _logo_data_uri():
-    """
-    Return a data: URI for the first logo found in assets.
-    Supports: .svg, .png, .jpg, .jpeg, .gif, .webp
-    """
-    candidates = [
-        "assets/neogen_logo.svg", "assets/neogen_logo.png", "assets/neogen_logo.jpg", "assets/neogen_logo.jpeg",
-        "assets/logo.svg",        "assets/logo.png",        "assets/logo.jpg",        "assets/logo.jpeg",
-        "assets/neogen_logo.webp","assets/logo.webp","assets/neogen_logo.gif","assets/logo.gif"
-    ]
-    for c in candidates:
-        p = Path(c)
-        if p.exists():
-            ext = p.suffix.lower()
-            if ext == ".svg":
-                txt = p.read_text(encoding="utf-8")
-                # URL-encode the SVG so it’s safe inside the src attribute
-                return "data:image/svg+xml;utf8," + quote(txt)
-            else:
-                mime = {
-                    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                    ".gif": "image/gif", ".webp": "image/webp"
-                }.get(ext, "application/octet-stream")
-                b64 = base64.b64encode(p.read_bytes()).decode("ascii")
-                return f"data:{mime};base64,{b64}"
+def _find_logo_file():
+    # Prefer raster formats first (PNG/JPG/etc.), then SVG
+    names = ["neogen_logo", "logo"]
+    raster_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif"]
+    svg_exts = [".svg"]
+    for n in names:
+        for ext in raster_exts:
+            p = Path("assets") / f"{n}{ext}"
+            if p.exists():
+                return p
+    for n in names:
+        for ext in svg_exts:
+            p = Path("assets") / f"{n}{ext}"
+            if p.exists():
+                return p
     return None
 
+def _data_uri(path: Path) -> str | None:
+    ext = path.suffix.lower()
+    if ext == ".svg":
+        txt = path.read_text(encoding="utf-8")
+        return "data:image/svg+xml;utf8," + quote(txt)
+    mime = {
+        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+        ".gif": "image/gif", ".webp": "image/webp"
+    }.get(ext)
+    if not mime:
+        return None
+    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{b64}"
+
 def header(title: str, kicker: str = "Neogen HR Suite"):
-    logo = _logo_data_uri()
-    # Fallback block if no logo found
-    if logo:
-        logo_html = f'<img src="{logo}" alt="Neogen"/>'
+    path = _find_logo_file()
+    if path:
+        uri = _data_uri(path)
+        logo_html = f'<img src="{uri}" alt="Neogen" style="height:34px;display:block;" />' if uri else ""
     else:
+        # Blue square fallback so it's obvious if a logo wasn't found
         logo_html = '<div style="width:34px;height:34px;background:#0072CE;border-radius:8px"></div>'
 
     st.markdown(
