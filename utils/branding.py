@@ -57,7 +57,7 @@ def header(title: str, kicker: str = "Neogen HR Suite", logo_width: int = 140):
         st.markdown(f'<div class="neogen-badge">{kicker}</div>', unsafe_allow_html=True)
 
     st.title(title)
-    st.caption("Consistent, fast, and high-quality HR workflows.")
+    st.caption("Consistent, fast, and high-quality HR workflows."); ver=_read_version();\n    if ver: st.caption(ver)
 
 def sidebar_model_controls():
     st.sidebar.markdown("### Model Settings")
@@ -78,3 +78,10 @@ def inject_css():
         st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
     except Exception:
         pass
+
+def _read_version():
+    from pathlib import Path
+    try:
+        return Path("VERSION.txt").read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
