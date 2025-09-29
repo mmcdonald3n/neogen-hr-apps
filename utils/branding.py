@@ -1,63 +1,59 @@
 ﻿import streamlit as st
 from pathlib import Path
 from urllib.parse import quote
+import base64
+import mimetypes
 
 def _find_logo_file() -> Path | None:
-    """
-    Look for a logo in /assets relative to BOTH:
-      - the repo root (utils/..)
-      - the current working directory (Streamlit runtime)
-    Prefer raster (PNG/JPG/WebP/GIF), then SVG.
-    """
-    # repo root = utils/.. (this file is utils/branding.py)
     repo_root = Path(__file__).resolve().parents[1]
-    candidates_dirs = [Path.cwd(), repo_root]
-
+    search_dirs = [Path.cwd(), repo_root]
     names = ["neogen_logo", "logo"]
-    raster_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif"]
-    svg_exts = [".svg"]
-
-    for base in candidates_dirs:
+    exts  = [".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]
+    for d in search_dirs:
         for n in names:
-            for ext in raster_exts:
-                p = base / "assets" / f"{n}{ext}"
+            for ext in exts:
+                p = d / "assets" / f"{n}{ext}"
                 if p.exists():
                     return p
-
-    for base in candidates_dirs:
-        for n in names:
-            for ext in svg_exts:
-                p = base / "assets" / f"{n}{ext}"
-                if p.exists():
-                    return p
-
     return None
 
-def _svg_html(p: Path, width_px: int) -> str:
-    data = p.read_text(encoding="utf-8")
-    uri = "data:image/svg+xml;utf8," + quote(data)
-    return f'<img src="{uri}" alt="Neogen" style="width:{width_px}px; display:block;" />'
+def _logo_html_inline(p: Path, height_px: int = 40) -> str:
+    # Return <img ...> with data URI (works for raster & SVG)
+    if p.suffix.lower() == ".svg":
+        data = p.read_text(encoding="utf-8")
+        uri  = "data:image/svg+xml;utf8," + quote(data)
+        return f'<img src="{uri}" alt="Neogen" style="height:{height_px}px;display:block;" />'
+    else:
+        mime, _ = mimetypes.guess_type(p.name)
+        if not mime:
+            mime = "image/png"
+        b64 = base64.b64encode(p.read_bytes()).decode("ascii")
+        return f'<img src="data:{mime};base64,{b64}" alt="Neogen" style="height:{height_px}px;display:block;" />'
 
-def header(title: str, kicker: str = "Neogen HR Suite", logo_width: int = 140):
-    # Layout: small logo column + kicker, then title/caption
+def _read_version() -> str:
+    try:
+        return Path("VERSION.txt").read_text(encoding="utf-8").strip()
+    except Exception:
+        return ""
+
+def header(title: str, kicker: str = "Neogen HR Suite", logo_height: int = 40):
     c1, c2 = st.columns([1, 9], gap="small")
     logo_path = _find_logo_file()
-
     with c1:
         if logo_path:
-            if logo_path.suffix.lower() == ".svg":
-                st.markdown(_svg_html(logo_path, logo_width), unsafe_allow_html=True)
-            else:
-                # Raster formats use st.image (most reliable)
-                st.image(str(logo_path), width=logo_width)
+            st.markdown(_logo_html_inline(logo_path, logo_height), unsafe_allow_html=True)
         else:
             st.markdown('<div style="width:140px;height:40px;background:#0072CE;border-radius:8px"></div>', unsafe_allow_html=True)
-
     with c2:
         st.markdown(f'<div class="neogen-badge">{kicker}</div>', unsafe_allow_html=True)
 
     st.title(title)
     st.caption("Consistent, fast, and high-quality HR workflows.")
+    ver = _read_version()
+    # Tiny debug note so we know where the logo came from
+    if ver:
+        st.caption(ver)
+    st.caption(f"Logo: {'found '+str(logo_path) if logo_path else 'not found in assets/'}")
 
 def sidebar_model_controls():
     st.sidebar.markdown("### Model Settings")
