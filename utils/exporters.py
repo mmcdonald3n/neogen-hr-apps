@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import List
 import re
 
-# --------- Logo discovery ----------
 def _find_logo_file() -> Path | None:
     repo_root = Path(__file__).resolve().parents[1]
     search_dirs = [Path.cwd(), repo_root]
@@ -17,7 +16,6 @@ def _find_logo_file() -> Path | None:
                     return p
     return None
 
-# --------- Simple Markdown splitter ----------
 _md_h1 = re.compile(r"^#\s+(.*)")
 _md_h2 = re.compile(r"^##\s+(.*)")
 _md_bullet = re.compile(r"^[-*•]\s+(.*)")
@@ -63,11 +61,11 @@ def _parse_markdown(md: str):
     for item in flush_par(): yield item
     for item in flush_ul(): yield item
 
-# --------- DOCX (python-docx) ----------
 def markdown_to_docx_bytes(md: str, filename_title: str = "Job Description") -> bytes:
     from docx import Document
     from docx.shared import Inches, Pt
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from io import BytesIO
 
     doc = Document()
     doc.core_properties.title = filename_title
@@ -103,16 +101,17 @@ def markdown_to_docx_bytes(md: str, filename_title: str = "Job Description") -> 
     doc.save(bio)
     return bio.getvalue()
 
-# --------- PDF (fpdf2) ----------
 def markdown_to_pdf_bytes(md: str, filename_title: str = "Job Description") -> bytes:
+    # PDF using pure-Python fpdf2 (works on Python 3.13)
     from fpdf import FPDF
+    from io import BytesIO
+
     pdf = FPDF(unit="pt", format="A4")
     pdf.set_auto_page_break(auto=True, margin=36)
     pdf.add_page()
-    # margins
     left, top, right = 36, 36, 36
     pdf.set_margins(left, top, right)
-    # header logo (right)
+
     logo = _find_logo_file()
     if logo and logo.exists():
         try:
@@ -131,10 +130,10 @@ def markdown_to_pdf_bytes(md: str, filename_title: str = "Job Description") -> b
         elif kind == "h2":
             write_para(content, size=14, style="B")
         elif kind == "p":
-            write_para(content, size=11, style="")
+            write_para(content, size=11)
         elif kind == "ul":
             for item in content:
-                write_para("• " + item, size=11, style="")
+                write_para("• " + item, size=11)
 
     out = BytesIO()
     out.write(bytes(pdf.output(dest="S")))
