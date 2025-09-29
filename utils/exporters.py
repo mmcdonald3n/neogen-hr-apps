@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List
 import re
 
-# --------- Logo discovery (same logic as branding) ----------
+# --------- Logo discovery ----------
 def _find_logo_file() -> Path | None:
     repo_root = Path(__file__).resolve().parents[1]
     search_dirs = [Path.cwd(), repo_root]
@@ -15,16 +15,14 @@ def _find_logo_file() -> Path | None:
                 p = d / "assets" / f"{n}{ext}"
                 if p.exists():
                     return p
-    # svg not supported in python-docx; skip for exporters
     return None
 
-# --------- Simple Markdown splitter (H1/H2, paragraphs, bullets) ----------
+# --------- Simple Markdown splitter ----------
 _md_h1 = re.compile(r"^#\s+(.*)")
 _md_h2 = re.compile(r"^##\s+(.*)")
 _md_bullet = re.compile(r"^[-*•]\s+(.*)")
 
 def _parse_markdown(md: str):
-    """Yield ('h1'|'h2'|'p'|'ul', text or [items]) preserving simple structure."""
     lines = [ln.rstrip() for ln in md.splitlines()]
     buf: List[str] = []
     bullets: List[str] = []
@@ -42,11 +40,9 @@ def _parse_markdown(md: str):
     while i < len(lines):
         ln = lines[i]
         if not ln.strip():
-            # blank
             for item in flush_par(): yield item
             for item in flush_ul(): yield item
-            i += 1
-            continue
+            i += 1; continue
         m1 = _md_h1.match(ln)
         m2 = _md_h2.match(ln)
         mb = _md_bullet.match(ln)
@@ -76,12 +72,10 @@ def markdown_to_docx_bytes(md: str, filename_title: str = "Job Description") -> 
     doc = Document()
     doc.core_properties.title = filename_title
 
-    # Base font
     style = doc.styles["Normal"]
     style.font.name = "Calibri"
     style.font.size = Pt(11)
 
-    # Header with logo (right aligned)
     logo = _find_logo_file()
     if logo and logo.exists():
         hdr = doc.sections[0].header
@@ -109,47 +103,39 @@ def markdown_to_docx_bytes(md: str, filename_title: str = "Job Description") -> 
     doc.save(bio)
     return bio.getvalue()
 
-# --------- PDF (ReportLab) ----------
+# --------- PDF (fpdf2) ----------
 def markdown_to_pdf_bytes(md: str, filename_title: str = "Job Description") -> bytes:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Image, Spacer, ListFlowable, ListItem
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.enums import TA_RIGHT
-    from reportlab.lib.units import inch
-
-    buf = BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4,
-                            leftMargin=36, rightMargin=36, topMargin=36, bottomMargin=36,
-                            title=filename_title)
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(name="H1", parent=styles["Heading1"], spaceAfter=6))
-    styles.add(ParagraphStyle(name="H2", parent=styles["Heading2"], spaceAfter=6))
-    styles.add(ParagraphStyle(name="Body", parent=styles["BodyText"], spaceAfter=6))
-    styles.add(ParagraphStyle(name="LogoRight", parent=styles["Normal"], alignment=TA_RIGHT))
-
-    flow = []
-
-    # Logo in header (right)
+    from fpdf import FPDF
+    pdf = FPDF(unit="pt", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=36)
+    pdf.add_page()
+    # margins
+    left, top, right = 36, 36, 36
+    pdf.set_margins(left, top, right)
+    # header logo (right)
     logo = _find_logo_file()
     if logo and logo.exists():
         try:
-            img = Image(str(logo), height=0.45*inch, width=None)
-            img.hAlign = "RIGHT"
-            flow += [img, Spacer(1, 8)]
+            pdf.image(str(logo), x=pdf.w - right - 120, y=top-6, h=36)
         except Exception:
             pass
 
-    # Content
+    def write_para(text: str, size=11, style=""):
+        pdf.set_font("Helvetica", style, size)
+        pdf.multi_cell(w=pdf.w - left - right, h=16, txt=text)
+        pdf.ln(2)
+
     for kind, content in _parse_markdown(md):
         if kind == "h1":
-            flow.append(Paragraph(content, styles["H1"]))
+            write_para(content, size=18, style="B")
         elif kind == "h2":
-            flow.append(Paragraph(content, styles["H2"]))
+            write_para(content, size=14, style="B")
         elif kind == "p":
-            flow.append(Paragraph(content, styles["Body"]))
+            write_para(content, size=11, style="")
         elif kind == "ul":
-            items = [ListItem(Paragraph(it, styles["Body"])) for it in content]
-            flow.append(ListFlowable(items, bulletType="bullet", leftIndent=18))
+            for item in content:
+                write_para("• " + item, size=11, style="")
 
-    doc.build(flow)
-    return buf.getvalue()
+    out = BytesIO()
+    out.write(bytes(pdf.output(dest="S")))
+    return out.getvalue()
