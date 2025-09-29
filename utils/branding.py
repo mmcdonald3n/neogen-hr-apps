@@ -3,8 +3,8 @@ from pathlib import Path
 import base64
 from urllib.parse import quote
 
-def _find_logo_file():
-    # Prefer raster formats first (PNG/JPG/etc.), then SVG
+def _find_logo_file() -> Path | None:
+    # Prefer raster formats first, then SVG
     names = ["neogen_logo", "logo"]
     raster_exts = [".png", ".jpg", ".jpeg", ".webp", ".gif"]
     svg_exts = [".svg"]
@@ -20,38 +20,32 @@ def _find_logo_file():
                 return p
     return None
 
-def _data_uri(path: Path) -> str | None:
-    ext = path.suffix.lower()
-    if ext == ".svg":
-        txt = path.read_text(encoding="utf-8")
-        return "data:image/svg+xml;utf8," + quote(txt)
-    mime = {
-        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-        ".gif": "image/gif", ".webp": "image/webp"
-    }.get(ext)
-    if not mime:
-        return None
-    b64 = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{b64}"
+def _svg_data_uri(p: Path) -> str:
+    return "data:image/svg+xml;utf8," + quote(p.read_text(encoding="utf-8"))
 
-def header(title: str, kicker: str = "Neogen HR Suite"):
-    path = _find_logo_file()
-    if path:
-        uri = _data_uri(path)
-        logo_html = f'<img src="{uri}" alt="Neogen" style="height:34px;display:block;" />' if uri else ""
-    else:
-        # Blue square fallback so it's obvious if a logo wasn't found
-        logo_html = '<div style="width:34px;height:34px;background:#0072CE;border-radius:8px"></div>'
+def header(title: str, kicker: str = "Neogen HR Suite", logo_width: int = 140):
+    # Top row: logo + kicker (side by side), then title + caption
+    c1, c2 = st.columns([1, 9], gap="small")
+    logo_path = _find_logo_file()
 
-    st.markdown(
-        f"""
-        <div class="neogen-header">
-            {logo_html}
-            <div class="neogen-badge">{kicker}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with c1:
+        if logo_path:
+            if logo_path.suffix.lower() == ".svg":
+                # Inline the SVG via HTML to control size
+                uri = _svg_data_uri(logo_path)
+                st.markdown(f'<img src="{uri}" alt="Neogen" style="width:{logo_width}px; display:block;" />',
+                            unsafe_allow_html=True)
+            else:
+                # PNG/JPG/WebP/GIF: st.image is most reliable
+                st.image(str(logo_path), width=logo_width)
+        else:
+            # Obvious fallback so you know if logo wasn't found
+            st.markdown('<div style="width:140px;height:40px;background:#0072CE;border-radius:8px"></div>',
+                        unsafe_allow_html=True)
+
+    with c2:
+        st.markdown(f'<div class="neogen-badge">{kicker}</div>', unsafe_allow_html=True)
+
     st.title(title)
     st.caption("Consistent, fast, and high-quality HR workflows.")
 
