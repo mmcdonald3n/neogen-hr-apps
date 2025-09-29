@@ -1,0 +1,18 @@
+﻿Code,Name,Descriptor,SeniorityWeight
+S1,Entry,Entry,1
+S2,Intermediate,Intermediate,2
+S3,Senior,Senior,3
+S4,Highly Skilled,Highly Skilled,4
+S5,Specialist,Specialist,4
+P1,Entry,Entry,1
+P2,Developing,Developing,2
+P3,Career,Career,3
+P4,Advanced,Advanced,4
+P5,Expert,Expert,5
+P6,Principal,Principal,6
+M1,Supervisor,Supervisor,3
+M2,Senior Supervisor,Senior Supervisor,4
+M3,Manager,Manager,5
+M4,Senior Manager,Senior Manager,6
+M5,Director,Director,7
+M6,Senior Director,Senior Director,8

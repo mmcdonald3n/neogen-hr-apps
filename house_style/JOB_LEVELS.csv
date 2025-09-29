@@ -1,9 +1,12 @@
-﻿Level,Name,Descriptor
-L1,Associate,Early career / entry
-L2,Specialist,Experienced individual contributor
-L3,Senior,Senior IC / Tech lead
-L4,Manager,Leads a small team
-L5,Senior Manager,Leads multiple teams
-L6,Director,Function leadership scope
-L7,Senior Director,Multi-function leadership
-L8,VP,Enterprise scope
+﻿Code,Name,Descriptor,Track,Rank
+S1,Entry,Most junior skilled level,Skilled,1
+S2,Intermediate,Developing skilled level,Skilled,2
+S3,Senior,Experienced skilled level,Skilled,3
+S4,Highly Skilled,Advanced skilled expert,Skilled,4
+S5,Specialist,Top skilled specialist,Skilled,5
+M1,Supervisor,Leads individuals/shift,Manager,1
+M2,Senior Supervisor,Leads team leads/complex ops,Manager,2
+M3,Manager,Leads a team/function,Manager,3
+M4,Senior Manager,Leads multiple teams,Manager,4
+M5,Director,Function/region leadership,Manager,5
+M6,Senior Director,Multi-function/region leadership,Manager,6
