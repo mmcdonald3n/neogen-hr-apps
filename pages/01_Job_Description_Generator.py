@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 from utils.branding import header, sidebar_model_controls, inject_css
 from utils.llm import chat_complete
-from utils.exporters import markdown_to_docx_bytes, markdown_to_pdf_bytes
+from utils.exporters import markdown_to_docx_bytes
 
 st.set_page_config(page_title="Job Description Generator", page_icon="📝", layout="wide")
 inject_css()
@@ -15,14 +15,14 @@ HOUSE_STYLE_PATH = Path("house_style/NEOGEN_HOUSE_STYLE_JD.md")
 house_style_text = HOUSE_STYLE_PATH.read_text(encoding="utf-8") if HOUSE_STYLE_PATH.exists() else "# Neogen JD House Style\n"
 st.info("House Style is centrally controlled. JDs are always generated to Neogen House Style.")
 
-# Levels S1–S5 / M1–M6
+# Levels S1–S5 / M1–M6 (no L-grades)
 levels_df = pd.read_csv("house_style/JOB_LEVELS.csv")
 levels_df = levels_df[levels_df["Code"].str.startswith(("S","M"))].copy()
 levels_df["Display"] = levels_df.apply(lambda r: f"{r['Code']} – {r['Name']} ({r['Descriptor']})", axis=1)
 order = list(levels_df[levels_df["Code"].str.startswith("S")]["Code"]) + list(levels_df[levels_df["Code"].str.startswith("M")]["Code"])
 display_order = [levels_df.loc[levels_df["Code"]==c, "Display"].iloc[0] for c in order]
 
-# Countries
+# Countries (Neogen list if present)
 countries = pd.read_csv("house_style/NEOGEN_COUNTRIES.csv")["Country"].dropna().tolist() if Path("house_style/NEOGEN_COUNTRIES.csv").exists() else ["United Kingdom","United States"]
 
 def default_detail_for(level_code: str) -> int:
@@ -105,7 +105,7 @@ Markdown only. Start with the Job Title as H1, then sections per House Style (Ro
         )
 
     st.markdown("### Output")
-    c_md, c_docx, c_pdf = st.columns([1,1,1])
+    c_md, c_docx = st.columns([1,1])
     with c_md:
         st.download_button(
             "Download as .md",
@@ -119,13 +119,6 @@ Markdown only. Start with the Job Title as H1, then sections per House Style (Ro
             data=markdown_to_docx_bytes(out, filename_title=job_title),
             file_name=f"{job_title.replace(' ', '_')}_JD.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-    with c_pdf:
-        st.download_button(
-            "Download as .pdf",
-            data=markdown_to_pdf_bytes(out, filename_title=job_title),
-            file_name=f"{job_title.replace(' ', '_')}_JD.pdf",
-            mime="application/pdf"
         )
 
     st.markdown(out)
