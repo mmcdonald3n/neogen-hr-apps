@@ -1,5 +1,6 @@
 ﻿import streamlit as st
 from utils.branding import header, inject_css
+from textwrap import dedent
 
 st.set_page_config(page_title="Neogen HR Apps", page_icon="✅", layout="wide")
 inject_css()
@@ -18,23 +19,22 @@ tiles = [
 long_tile = ("07_Shortlisting_Summary_Tool.py", "🧮", "Shortlisting Summary Tool",
              "Upload up to five CVs + a JD to generate an executive comparison.")
 
-# ---- Build one HTML string with ALL tiles so CSS grid works ----
-tiles_html = ['<div class="tile-grid">']
+html_parts = ['<div class="tile-grid">']
 for page_file, emoji, title, desc in tiles:
-    tiles_html.append(f"""
-    <a class="tile" href="/?page={page_file}">
-      <div class="emoji">{emoji}</div>
-      <div>
-        <div class="kicker">Tool</div>
-        <h3>{title}</h3>
-        <p>{desc}</p>
-      </div>
-      <div class="chev">➜</div>
-    </a>
-    """)
+    html_parts.append(dedent(f"""\
+<a class="tile" href="/?page={page_file}">
+  <div class="emoji">{emoji}</div>
+  <div>
+    <div class="kicker">Tool</div>
+    <h3>{title}</h3>
+    <p>{desc}</p>
+  </div>
+  <div class="chev">➜</div>
+</a>
+"""))
 
 lp, lemoji, ltitle, ldesc = long_tile
-tiles_html.append(f"""
+html_parts.append(dedent(f"""\
 <a class="tile long" href="/?page={lp}">
   <div class="emoji">{lemoji}</div>
   <div>
@@ -44,10 +44,10 @@ tiles_html.append(f"""
   </div>
   <div class="chev">➜</div>
 </a>
-""")
-tiles_html.append("</div>")
+"""))
+html_parts.append("</div>")
 
-st.markdown("".join(tiles_html), unsafe_allow_html=True)
+st.markdown("".join(html_parts), unsafe_allow_html=True)
 
 # Router
 page = st.query_params.get("page", None)
