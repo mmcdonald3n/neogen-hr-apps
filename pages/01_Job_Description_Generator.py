@@ -1,6 +1,7 @@
 ﻿import streamlit as st
 from utils.branding import header, sidebar_model_controls, inject_css
 from utils.llm import chat_complete
+from utils.exporters import markdown_to_docx_bytes, markdown_to_pdf_bytes
 from pathlib import Path
 import pandas as pd
 
@@ -109,3 +110,4 @@ Markdown only. Start with the Job Title as H1, then sections per House Style (Ro
         mime="text/markdown"
     )
     st.markdown(out)
+

@@ -5,3 +5,4 @@ pypdf
 pandas
 numpy
 tqdm
+reportlab==3.6.13
