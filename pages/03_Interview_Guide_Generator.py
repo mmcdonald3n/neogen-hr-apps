@@ -3,6 +3,7 @@ from utils.branding import header, inject_css
 from utils.parsers import extract_text
 from utils.llm import chat_complete
 from utils.exporters import markdown_to_docx_bytes
+from utils.exporters import interview_pack_to_docx_bytes
 
 st.set_page_config(page_title="Interview Guide Generator", layout="wide")
 inject_css()
@@ -95,15 +96,19 @@ Keep wording concise, inclusive, and plain-English. Avoid jargon.
     with st.spinner("Creating guide..."):
         guide_md = chat_complete(prompt, max_tokens=1800)
 
-    st.subheader("Preview")
-    st.markdown(guide_md)
+    docx_bytes = interview_pack_to_docx_bytes(
+    guide_md=guide_md,
+    job_title=job_title or "Role",
+    stage=stage,          # e.g. "1st Interview"
+    level=level,          # e.g. "S1".."M6"
+    length=length,        # e.g. "60 mins"
+    logo_path="assets/neogen_logo.png",
+)
 
-    # DOCX download
-    docx_bytes = markdown_to_docx_bytes(guide_md, filename_title=job_title)
-    st.download_button(
-        "Download as .docx",
-        data=docx_bytes,
-        file_name=f"Neogen_Interview_Guide_{job_title.replace(' ','_')}.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        use_container_width=True
-    )
+st.download_button(
+    "Download as .docx",
+    data=docx_bytes,
+    file_name=f"{job_title.replace(' ','_')}_Interview_Pack.docx",
+    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+)
+
