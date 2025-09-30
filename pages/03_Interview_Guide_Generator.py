@@ -6,7 +6,7 @@ import streamlit as st
 from utils.branding import header, sidebar_model_controls, inject_css
 from utils.llm import chat_complete
 from utils.parsers import extract_text_from_upload
-from utils.exporters import interview_pack_to_docx_bytes  # template-driven boxed DOCX
+from utils.exporters import interview_pack_to_docx_bytes  # boxed DOCX
 
 st.set_page_config(page_title="Interview Guide / Question Generator", page_icon="🧩", layout="wide")
 inject_css()
@@ -29,27 +29,16 @@ def _load_vendor_seed_texts():
     return files
 
 def _rebrand_to_neogen(text: str) -> str:
-    text = re.sub(r"PowerDash\s*-\s*HR|PowerDash\s*HR|Power\s*-\s*Dash|PowerDash", "Neogen", text, flags=re.IGNORECASE)
-    return text
+    return re.sub(r"PowerDash\s*-\s*HR|PowerDash\s*HR|Power\s*-\s*Dash|PowerDash", "Neogen", text, flags=re.IGNORECASE)
 
-# Fixed Neogen levels (S1–S5, M1–M6)
+# Levels (S1–S5, M1–M6) and stages
 LEVELS = ["S1","S2","S3","S4","S5","M1","M2","M3","M4","M5","M6"]
-
-STAGES = [
-    "1st Interview (screen / intro)",
-    "2nd Interview (functional deep-dive)",
-    "Panel Interview",
-    "Final Interview",
-]
+STAGES = ["1st Interview (screen / intro)","2nd Interview (functional deep-dive)","Panel Interview","Final Interview"]
 
 DEFAULT_COMPETENCIES = [
-    "Leadership & Ownership",
-    "Stakeholder Management",
-    "Execution & Delivery",
-    "Problem Solving / Analytical",
-    "Communication & Influence",
-    "Technical / Functional Depth",
-    "Culture & Values",
+    "Leadership & Ownership","Stakeholder Management","Execution & Delivery",
+    "Problem Solving / Analytical","Communication & Influence",
+    "Technical / Functional Depth","Culture & Values",
 ]
 
 with st.form("ivq_form"):
@@ -59,7 +48,7 @@ with st.form("ivq_form"):
     with c2:
         level_code = st.selectbox("Level*", LEVELS, index=5)
     with c3:
-        role_type = st.selectbox("Role Type*", ["Individual Contributor", "People Manager"])
+        role_type = st.selectbox("Role Type*", ["Individual Contributor","People Manager"])
 
     c4, c5, c6 = st.columns([2,2,2])
     with c4:
@@ -90,12 +79,8 @@ if submitted:
         st.error("Please provide a Job Title.")
         st.stop()
 
-    # Parse competencies (optional)
-    comps = [c.strip(" •-*–\t") for c in (comps_text or "").splitlines() if c.strip()]
-    if not comps:
-        comps = DEFAULT_COMPETENCIES
+    comps = [c.strip(" •-*–\t") for c in (comps_text or "").splitlines() if c.strip()] or DEFAULT_COMPETENCIES
 
-    # Extract JD text (optional)
     source_text = ""
     if jd_file is not None:
         try:
@@ -103,7 +88,6 @@ if submitted:
         except Exception:
             source_text = ""
 
-    # Load & rebrand selected seed templates (optional)
     seed_bundle = ""
     if seed_selected:
         parts = []
@@ -116,16 +100,12 @@ if submitted:
         seed_bundle = "\n\n".join(parts)
 
     def tone_label(v:int) -> str:
-        if v <= 2: return "Plain / Direct"
-        if v <= 4: return "Professional / Neutral"
-        if v <= 7: return "Polished / Executive"
-        return "Formal / High-polish"
+        return ["Plain / Direct","Plain / Direct","Plain / Direct","Professional / Neutral",
+                "Professional / Neutral","Polished / Executive","Polished / Executive",
+                "Polished / Executive","Formal / High-polish","Formal / High-polish","Formal / High-polish"][v]
 
     def detail_label(v:int) -> str:
-        if v <= 3: return "Concise (lean)"
-        if v <= 6: return "Standard (balanced)"
-        if v <= 8: return "Detailed (thorough)"
-        return "Very Detailed (comprehensive)"
+        return ["Concise (lean)"]*4 + ["Standard (balanced)"]*3 + ["Detailed (thorough)"]*2 + ["Very Detailed (comprehensive)"]
 
     system = "You are an expert interviewer enablement writer. Produce interview packs that strictly follow the House Style. Use inclusive, bias-aware language and STAR-friendly prompts."
 
@@ -140,8 +120,8 @@ CONTEXT:
 - Interview Stage: {stage}
 - Interview Length: {length}
 - Competencies: {", ".join(comps)}
-- Tone: {tone_label(tone)} (slider={tone})
-- Detail: {detail_label(detail)} (slider={detail})
+- Tone: {tone_label(tone)}
+- Detail: {detail_label(detail)}
 - Optional notes: {notes}
 
 SEED_TEMPLATES (optional; rebranded to Neogen):
@@ -160,7 +140,7 @@ REQUIREMENTS:
   ## Closing Questions
   ## Close-down & Next Steps
   ## Scoring Rubric
-- For each of the five “question” sections (Core/Competency/Technical/Culture & Values/Closing), format each question block as:
+- For each of the five “question” sections, format each question block as:
   ### {{Question text}}
   **Intent:** …
   **What good looks like:** …
