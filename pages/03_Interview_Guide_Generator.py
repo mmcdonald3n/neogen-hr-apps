@@ -157,3 +157,30 @@ Brief, warm closing that thanks the candidate, explains next steps and timelines
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         type="primary",
     )
+
+# === NEOGEN BOXED DOCX DOWNLOAD (auto added) ===
+try:
+    if 'guide_md' in locals() and isinstance(guide_md, str) and guide_md.strip():
+        from utils.exporters import interview_pack_to_docx_bytes
+        job_name = job_title if 'job_title' in locals() else "Role"
+        lvl      = level if 'level' in locals() else ""
+        stg      = stage if 'stage' in locals() else ""
+        dur      = duration if 'duration' in locals() else ""
+        docx_bytes = interview_pack_to_docx_bytes(
+            guide_md=guide_md,
+            title="Interview Guide",
+            job_title=job_name,
+            level=lvl,
+            stage=stg,
+            duration=dur,
+            logo_path="assets/neogen_logo.png",
+        )
+        st.download_button(
+            "Download as .docx",
+            data=docx_bytes,
+            file_name=f"{job_name.replace(' ','_')}_Interview_Guide.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        )
+except Exception as _e:
+    pass
+# === END NEOGEN BOXED DOCX DOWNLOAD ===
