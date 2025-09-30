@@ -5,7 +5,7 @@ import re
 from utils.branding import header, sidebar_model_controls, inject_css
 from utils.llm import chat_complete
 from utils.parsers import extract_text_from_upload
-from utils.exporters import markdown_to_docx_bytes
+from utils.exporters import interview_to_docx_bytes
 
 st.set_page_config(page_title="Interview Guide / Question Generator", page_icon="🧩", layout="wide")
 inject_css()
@@ -63,6 +63,7 @@ with st.form("ivq_form"):
     c4, c5, c6 = st.columns([2,2,2])
     with c4:
         stage = st.selectbox("Interview Stage*", STAGES)
+    length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
     with c5:
         tone = st.slider("Tone", 0, 10, 5, help="Plain → Formal")
     with c6:
@@ -169,7 +170,8 @@ REQUIREMENTS:
 
     st.download_button(
         "Download as .docx",
-        data=markdown_to_docx_bytes(guide_md, filename_title=job_title + " – Interview Guide"),
+        data=interview_to_docx_bytes(guide_md, job_title=job_title, stage=stage, duration=length),
         file_name=f"{job_title.replace(' ', '_')}_Interview_Guide.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+
