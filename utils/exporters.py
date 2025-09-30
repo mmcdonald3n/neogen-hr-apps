@@ -283,3 +283,14 @@ def interview_pack_to_docx_bytes(
     bio = BytesIO()
     doc.save(bio)
     return bio.getvalue()
+# --- Back-compat alias so existing imports keep working ---
+def markdown_to_docx_bytes(guide_md, job_title, stage, level, length, logo_path):
+    """Alias to support older imports; forwards to interview_pack_to_docx_bytes."""
+    return interview_pack_to_docx_bytes(
+        guide_md=guide_md,
+        job_title=job_title,
+        stage=stage,
+        level=level,
+        length=length,
+        logo_path=logo_path,
+    )
