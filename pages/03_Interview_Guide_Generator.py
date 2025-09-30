@@ -28,7 +28,23 @@ def _run_llm(prompt_text: str) -> str:
             return chat_complete(prompt=prompt_text, max_tokens=1800)
         except TypeError:
             msgs = [{"role": "user", "content": prompt_text}]
-            return chat_complete(messages=msgs, max_tokens=1800)
+            def _run_llm(prompt: str) -> str:
+    # Build your messages list like you already do:
+    msgs = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+
+    # Call the LLM helper, but be compatible with both signatures:
+    from utils.llm import chat_complete
+    try:
+        # New-style helper that accepts messages=
+        return chat_complete(messages=msgs, max_tokens=1800)
+    except TypeError:
+        # Old-style helper that expects a single prompt string
+        joined = f"{SYSTEM_PROMPT}\n\n{prompt}"
+        return chat_complete(joined, max_tokens=1800)
+
 
 def _slugify(s: str) -> str:
     s = s.strip().lower()
