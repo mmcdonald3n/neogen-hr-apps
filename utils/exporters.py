@@ -183,3 +183,171 @@ def markdown_to_pdf_bytes(md: str, filename_title: str = "Job Description") -> b
     out = BytesIO()
     out.write(bytes(pdf.output(dest="S")))
     return out.getvalue()
+# ========= Neogen Interview Guide DOCX (boxed layout) =========
+from io import BytesIO
+from docx import Document
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from pathlib import Path
+import re
+
+def _add_logo_header_footer(doc: Document, logo_path: str, footer_text: str = "Powered by Neogen HR"):
+    sec = doc.sections[0]
+    # margins a bit airier
+    sec.top_margin, sec.bottom_margin = Inches(0.6), Inches(0.6)
+    sec.left_margin, sec.right_margin = Inches(0.7), Inches(0.7)
+
+    # Header with right-aligned logo
+    header = sec.header
+    par = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+    par.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    try:
+        if Path(logo_path).exists():
+            run = par.add_run()
+            run.add_picture(logo_path, width=Inches(1.35))
+    except Exception:
+        pass
+
+    # Footer text, right aligned
+    footer = sec.footer
+    fpar = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    fpar.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    fpar.text = footer_text
+    for r in fpar.runs:
+        r.font.size = Pt(8)
+
+def _h_rule(par):
+    # poor-man HR: bottom border
+    p = par._element
+    pPr = p.get_or_add_pPr()
+    pbdr = OxmlElement('w:pBdr')
+    bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single')
+    bottom.set(qn('w:sz'), '6')
+    bottom.set(qn('w:space'), '1')
+    bottom.set(qn('w:color'), '9CA3AF')  # slate-400
+    pbdr.append(bottom)
+    pPr.append(pbdr)
+
+def _section_chip(doc: Document, text: str):
+    # heading + thin rule to mimic a "chip"
+    h = doc.add_paragraph(text)
+    h.style = doc.styles['Heading 2'] if 'Heading 2' in doc.styles else None
+    for r in h.runs: r.font.size = Pt(14)
+    _h_rule(doc.add_paragraph(""))
+
+def _card(doc: Document, lines: list[str]):
+    # Single-cell table used as a "box"
+    tbl = doc.add_table(rows=1, cols=1)
+    cell = tbl.rows[0].cells[0]
+    # light border & padding via paragraph spacing
+    p = cell.paragraphs[0]
+    for ln in lines:
+        run = p.add_run(ln + "\n")
+        run.font.size = Pt(11)
+    # Add a blank paragraph after the box
+    doc.add_paragraph("")
+
+def _split_questions(md: str):
+    # Very forgiving splitter: looks for lines that start with a question-ish header or bold "Q"
+    blocks = []
+    cur = []
+    for line in md.splitlines():
+        if re.match(r'^\s*(#{3,5}\s+|[*-]\s*Q[: ]|Q[: ])', line):
+            if cur:
+                blocks.append("\n".join(cur).strip())
+                cur = []
+        cur.append(line)
+    if cur: blocks.append("\n".join(cur).strip())
+    return blocks
+
+def _parse_block_to_card_lines(block: str):
+    # Extract Question / Intent / Good / Follow-ups in a robust, label-insensitive way
+    # Accepts headings ####, bold labels, or plain labels with colon.
+    text = block.strip()
+
+    # Question line: first non-empty line without the label keywords
+    lines = [l.strip(" #*-") for l in text.splitlines() if l.strip()]
+    q = next((l for l in lines if re.match(r'(?i)^(Q[:\-\s]|Describe|Tell me|Give an example|Explain|How do you)\b', l)), lines[0] if lines else "")
+
+    def grab(label):
+        m = re.search(rf'(?is)(?:^|\n)\s*{label}\s*:\s*(.+?)(?:\n[A-Z][^\n]{0,50}\s*:|\Z)', text, re.IGNORECASE)
+        return (m.group(1).strip() if m else "")
+
+    intent = grab(r'(Intent|Purpose|Why)')
+    good   = grab(r'(What\s+good\s+looks\s+like|Good\s+looks\s+like|Indicators|Evidence)')
+    foll   = grab(r'(Follow[-\s]*ups|Probes|Follow\s*up)')
+
+    out = []
+    if q:
+        out.append(q if q.endswith("?") else q + "")
+        out.append("")
+    if intent:
+        out.append(f"Intent: {intent}")
+    if good:
+        out.append(f"What good looks like: {good}")
+    if foll:
+        out.append(f"Follow-ups: {foll}")
+    return out if out else lines
+
+def interview_to_docx_bytes(
+    md: str,
+    *,
+    job_title: str,
+    stage: str,
+    duration: str = "60 mins",
+    logo_path: str = "assets/neogen_logo.png",
+    filename_title: str | None = None
+) -> bytes:
+    """
+    Build a Neogen-styled DOCX for interview guides with boxed question cards,
+    header logo and footer. We lightly parse common labels from Markdown.
+    """
+    doc = Document()
+    _add_logo_header_footer(doc, logo_path)
+
+    # Cover
+    title = doc.add_paragraph(job_title)
+    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    for r in title.runs:
+        r.font.size = Pt(22); r.bold = True
+
+    meta = doc.add_paragraph(f"Interview stage: {stage} · Duration: {duration}")
+    meta_format = meta.runs[0].font if meta.runs else meta.add_run().font
+    meta_format.size = Pt(11)
+
+    doc.add_paragraph("")  # spacing
+
+    # Try to recognize sections by H2 headings
+    sections = re.split(r'(?m)^\s*##\s+', md)
+    first = sections[0]
+    if len(sections) > 1:
+        # sections[0] may contain intro; keep scanning remaining
+        named = []
+        for s in sections[1:]:
+            name, _, body = s.partition("\n")
+            named.append((name.strip(), body.strip()))
+    else:
+        named = [("Guide", md)]
+
+    # Render sections
+    for name, body in named:
+        _section_chip(doc, name)
+        # If section appears to be a question set, build cards:
+        if re.search(r'(?i)question|core|technical|competenc|closing|culture', name):
+            for blk in _split_questions(body):
+                lines = _parse_block_to_card_lines(blk)
+                if lines: _card(doc, lines)
+        else:
+            # Otherwise just paragraph content (bullets will carry over into docx as plain lines)
+            for para in body.split("\n\n"):
+                p = doc.add_paragraph(para.strip())
+                for r in p.runs: r.font.size = Pt(11)
+            doc.add_paragraph("")
+
+    # Output
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
