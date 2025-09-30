@@ -127,7 +127,6 @@ if submitted:
         if v <= 8: return "Detailed (thorough)"
         return "Very Detailed (comprehensive)"
 
-    # Strong, explicit structure for the LLM
     system = "You are an expert interviewer enablement writer. Produce interview packs that strictly follow the House Style. Use inclusive, bias-aware language and STAR-friendly prompts."
 
     user_prompt = f"""
@@ -168,7 +167,6 @@ REQUIREMENTS:
   **Follow-ups:** …
 - Keep concise bullet lines for Housekeeping, Close-down & Next Steps, and Scoring Rubric.
 - Calibrate question depth to level {level_code} and tailor content for stage {stage}.
-- Match UK/US spelling if implied; avoid internal system names unless vital.
 """
 
     with st.spinner("Assembling your guide…"):
@@ -182,7 +180,6 @@ REQUIREMENTS:
     st.markdown("### Preview (Markdown)")
     st.code(guide_md, language="markdown")
 
-    # Word download (boxed layout, fixed sections, Neogen branding)
     st.download_button(
         "Download as .docx",
         data=interview_pack_to_docx_bytes(
