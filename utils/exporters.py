@@ -351,3 +351,161 @@ def interview_to_docx_bytes(
     bio = BytesIO()
     doc.save(bio)
     return bio.getvalue()
+# ========= Neogen Interview Pack DOCX (template-driven layout) =========
+from io import BytesIO
+from docx import Document
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from pathlib import Path
+import re
+
+# Reuse helpers if present; else define light ones
+def _add_logo_header_footer(doc: Document, logo_path: str, footer_text: str = "Powered by Neogen HR"):
+    sec = doc.sections[0]
+    sec.top_margin, sec.bottom_margin = Inches(0.6), Inches(0.6)
+    sec.left_margin, sec.right_margin = Inches(0.7), Inches(0.7)
+
+    header = sec.header
+    par = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+    par.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    try:
+        if Path(logo_path).exists():
+            run = par.add_run()
+            run.add_picture(logo_path, width=Inches(1.35))
+    except Exception:
+        pass
+
+    footer = sec.footer
+    fpar = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    fpar.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    fpar.text = footer_text
+    for r in fpar.runs: r.font.size = Pt(8)
+
+def _h_rule(par):
+    p = par._element
+    pPr = p.get_or_add_pPr()
+    pbdr = OxmlElement('w:pBdr'); bottom = OxmlElement('w:bottom')
+    bottom.set(qn('w:val'), 'single'); bottom.set(qn('w:sz'), '6'); bottom.set(qn('w:space'), '1'); bottom.set(qn('w:color'), '9CA3AF')
+    pbdr.append(bottom); pPr.append(pbdr)
+
+def _section_chip(doc: Document, text: str):
+    h = doc.add_paragraph(text)
+    h.style = doc.styles['Heading 2'] if 'Heading 2' in doc.styles else None
+    for r in h.runs: r.font.size = Pt(14); r.bold = True
+    _h_rule(doc.add_paragraph(""))
+
+def _bullet_block(doc: Document, text: str):
+    # render bullet-ish lines (split by blank line)
+    for line in [l.strip() for l in text.splitlines() if l.strip()]:
+        p = doc.add_paragraph(line)
+        p_format = p.paragraph_format
+        p_format.space_after = Pt(2)
+        for r in p.runs: r.font.size = Pt(11)
+    doc.add_paragraph("")
+
+def _split_questions(md: str):
+    # Split on obvious new question markers
+    blocks, cur = [], []
+    for line in md.splitlines():
+        if re.match(r'^\s*(#{3,5}\s+|[*-]\s*Q[: ]|Q[: ]|Tell me|Describe|Give an example|Explain|How do you)\b', line, re.IGNORECASE):
+            if cur: blocks.append("\n".join(cur).strip()); cur = []
+        cur.append(line)
+    if cur: blocks.append("\n".join(cur).strip())
+    return blocks
+
+def _parse_block(block: str):
+    text = block.strip()
+    # First non-empty line is the question unless it starts with a label
+    lines = [l.strip(" #*-") for l in text.splitlines() if l.strip()]
+    question = lines[0] if lines else ""
+
+    def grab(label):
+        m = re.search(rf'(?is)(?:^|\n)\s*{label}\s*:\s*(.+?)(?:\n[A-Z][^\n]{{0,50}}\s*:|\Z)', text, re.IGNORECASE)
+        return (m.group(1).strip() if m else "")
+
+    intent = grab(r'(Intent|Purpose|Why)')
+    good   = grab(r'(What\s+good\s+looks\s+like|Good\s+looks\s+like|Indicators|Evidence)')
+    follow = grab(r'(Follow[-\s]*ups|Probes|Follow\s*up)')
+    return question, intent, good, follow
+
+def _card(doc: Document, question: str, intent: str, good: str, follow: str):
+    tbl = doc.add_table(rows=1, cols=1)
+    cell = tbl.rows[0].cells[0]
+    p = cell.paragraphs[0]
+    # Question line (bold-ish)
+    rq = p.add_run((question or "").strip())
+    rq.font.size = Pt(12); rq.bold = True
+    p.add_run("\n")
+
+    if intent:
+        ri = p.add_run("Intent: "); ri.bold = True; ri.font.size = Pt(11)
+        p.add_run(intent + "\n").font.size = Pt(11)
+    if good:
+        rg = p.add_run("What good looks like: "); rg.bold = True; rg.font.size = Pt(11)
+        p.add_run(good + "\n").font.size = Pt(11)
+    if follow:
+        rf = p.add_run("Follow-ups: "); rf.bold = True; rf.font.size = Pt(11)
+        p.add_run(follow).font.size = Pt(11)
+
+    doc.add_paragraph("")
+
+SECTION_ORDER = [
+    "Housekeeping",
+    "Core Questions",
+    "Competency Questions",
+    "Technical Questions",
+    "Culture & Values",
+    "Closing Questions",
+    "Close-down & Next Steps",
+    "Scoring Rubric",
+]
+
+def _extract_section(md: str, name: str) -> str:
+    # Grab content under "## {name}" up to the next "##"
+    pat = rf'(?is)^\s*##\s*{re.escape(name)}\s*\n(.*?)(?=^\s*##\s|\Z)'
+    m = re.search(pat, md, re.MULTILINE)
+    return m.group(1).strip() if m else ""
+
+def interview_pack_to_docx_bytes(
+    md: str,
+    *,
+    job_title: str,
+    interview_type: str,
+    duration: str = "60 mins",
+    logo_path: str = "assets/neogen_logo.png",
+) -> bytes:
+    doc = Document()
+    _add_logo_header_footer(doc, logo_path)
+
+    # Cover
+    title = doc.add_paragraph(f"{job_title} — Competency Pack")
+    for r in title.runs: r.font.size = Pt(22); r.bold = True
+    meta = doc.add_paragraph(f"Interview type: {interview_type} · Duration: {duration}")
+    if meta.runs: meta.runs[0].font.size = Pt(11)
+    doc.add_paragraph("")
+
+    # Iterate sections in fixed order
+    for name in SECTION_ORDER:
+        body = _extract_section(md, name)
+        if not body: 
+            continue
+        _section_chip(doc, name)
+
+        if name in {"Core Questions","Competency Questions","Technical Questions","Culture & Values","Closing Questions"}:
+            # Expect question blocks
+            for blk in _split_questions(body):
+                q, intent, good, follow = _parse_block(blk)
+                if q or intent or good or follow:
+                    _card(doc, q, intent, good, follow)
+            doc.add_paragraph("")
+        elif name in {"Housekeeping","Close-down & Next Steps","Scoring Rubric"}:
+            _bullet_block(doc, body)
+        else:
+            # fallback
+            _bullet_block(doc, body)
+
+    bio = BytesIO()
+    doc.save(bio)
+    return bio.getvalue()
