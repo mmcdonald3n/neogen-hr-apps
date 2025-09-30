@@ -1,11 +1,12 @@
-﻿import streamlit as st
+﻿import re
 from pathlib import Path
 from glob import glob
-import re
+import streamlit as st
+
 from utils.branding import header, sidebar_model_controls, inject_css
 from utils.llm import chat_complete
 from utils.parsers import extract_text_from_upload
-from utils.exporters import interview_pack_to_docx_bytes
+from utils.exporters import interview_pack_to_docx_bytes  # template-driven boxed DOCX
 
 st.set_page_config(page_title="Interview Guide / Question Generator", page_icon="🧩", layout="wide")
 inject_css()
@@ -14,33 +15,33 @@ header("Interview Guide / Question Generator")
 # Sidebar model controls
 model, temp, max_tokens = sidebar_model_controls()
 
-# Read-only Neogen house style
+# House style (centrally controlled)
 HOUSE_STYLE_PATH = Path("house_style/NEOGEN_INTERVIEW_GUIDE_STYLE.md")
 house_style_text = HOUSE_STYLE_PATH.read_text(encoding="utf-8", errors="ignore") if HOUSE_STYLE_PATH.exists() else "# Neogen Interview Guide Style\n"
-st.info("Upload an optional JD and/or include seed templates. Output is a Neogen-style interview guide with competency questions, probes, and a scoring rubric. House Style is centrally controlled.")
+st.info("Upload an optional JD and/or include seed templates. Output is a Neogen-style interview pack. House Style is centrally controlled.")
 
 # Vendored seed templates helper + rebrand
 def _load_vendor_seed_texts():
     base = Path("vendor/powerdash-ivq")
     if not base.exists():
         return []
-    files = [Path(p) for p in glob(str(base / '**' / '*.md'), recursive=True)]
+    files = [Path(p) for p in glob(str(base / "**" / "*.md"), recursive=True)]
     return files
 
 def _rebrand_to_neogen(text: str) -> str:
-    text = re.sub(r'PowerDash\s*-?\s*HR', 'Neogen', text, flags=re.IGNORECASE)
-    text = re.sub(r'Power\s*-?\s*Dash',  'Neogen', text, flags=re.IGNORECASE)
-    text = re.sub(r'PowerDash',         'Neogen', text, flags=re.IGNORECASE)
+    text = re.sub(r"PowerDash\s*-\s*HR|PowerDash\s*HR|Power\s*-\s*Dash|PowerDash", "Neogen", text, flags=re.IGNORECASE)
     return text
 
 # Fixed Neogen levels (S1–S5, M1–M6)
 LEVELS = ["S1","S2","S3","S4","S5","M1","M2","M3","M4","M5","M6"]
+
 STAGES = [
     "1st Interview (screen / intro)",
     "2nd Interview (functional deep-dive)",
     "Panel Interview",
     "Final Interview",
 ]
+
 DEFAULT_COMPETENCIES = [
     "Leadership & Ownership",
     "Stakeholder Management",
@@ -56,20 +57,19 @@ with st.form("ivq_form"):
     with c1:
         job_title = st.text_input("Job Title*", placeholder="e.g., Senior Quality Engineer")
     with c2:
-        level_code = st.selectbox("Level*", LEVELS, index=5)  # default M1-ish
+        level_code = st.selectbox("Level*", LEVELS, index=5)
     with c3:
         role_type = st.selectbox("Role Type*", ["Individual Contributor", "People Manager"])
-    interview_type = st.selectbox("Interview Type*", ["Competency"], index=0)
 
     c4, c5, c6 = st.columns([2,2,2])
     with c4:
         stage = st.selectbox("Interview Stage*", STAGES)
-    length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
-    length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
     with c5:
-        tone = st.slider("Tone", 0, 10, 5, help="Plain → Formal")
+        length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
     with c6:
-        detail = st.slider("Level of Detail", 0, 10, 5, help="Concise → Comprehensive")
+        tone = st.slider("Tone", 0, 10, 5, help="Plain → Formal")
+
+    detail = st.slider("Level of Detail", 0, 10, 5, help="Concise → Comprehensive")
 
     comps_text = st.text_area("Key Competencies (one per line) — optional", height=120, placeholder="Leave blank to use defaults")
 
@@ -81,7 +81,8 @@ with st.form("ivq_form"):
         seed_choices = [str(p.relative_to(Path('.'))) for p in seed_files]
         seed_selected = st.multiselect("Optional: Include seed templates (from vendored repo)", seed_choices, default=[])
 
-    notes = st.text_area("Optional notes (team context, systems, regulatory elements, special focus areas)", height=120, placeholder="Leave blank if not needed.")
+    notes = st.text_area("Optional notes (team context, systems, regulatory elements, special focus areas)", height=100)
+
     submitted = st.form_submit_button("Generate Guide")
 
 if submitted:
@@ -89,10 +90,12 @@ if submitted:
         st.error("Please provide a Job Title.")
         st.stop()
 
-    comps = [c.strip(' •-*–\t') for c in (comps_text or '').splitlines() if c.strip()]
+    # Parse competencies (optional)
+    comps = [c.strip(" •-*–\t") for c in (comps_text or "").splitlines() if c.strip()]
     if not comps:
         comps = DEFAULT_COMPETENCIES
 
+    # Extract JD text (optional)
     source_text = ""
     if jd_file is not None:
         try:
@@ -100,12 +103,13 @@ if submitted:
         except Exception:
             source_text = ""
 
+    # Load & rebrand selected seed templates (optional)
     seed_bundle = ""
     if seed_selected:
         parts = []
         for rel in seed_selected:
             try:
-                t = Path(rel).read_text(encoding='utf-8', errors='ignore')
+                t = Path(rel).read_text(encoding="utf-8", errors="ignore")
                 parts.append(_rebrand_to_neogen(t))
             except Exception:
                 pass
@@ -123,7 +127,9 @@ if submitted:
         if v <= 8: return "Detailed (thorough)"
         return "Very Detailed (comprehensive)"
 
-    system = "You are an expert interviewer enablement writer. Produce interview guides that strictly follow the House Style. Use inclusive, bias-aware language and STAR-friendly prompts."
+    # Strong, explicit structure for the LLM
+    system = "You are an expert interviewer enablement writer. Produce interview packs that strictly follow the House Style. Use inclusive, bias-aware language and STAR-friendly prompts."
+
     user_prompt = f"""
 HOUSE_STYLE (read-only):
 {house_style_text}
@@ -133,6 +139,7 @@ CONTEXT:
 - Level: {level_code}
 - Role Type: {role_type}
 - Interview Stage: {stage}
+- Interview Length: {length}
 - Competencies: {", ".join(comps)}
 - Tone: {tone_label(tone)} (slider={tone})
 - Detail: {detail_label(detail)} (slider={detail})
@@ -154,27 +161,16 @@ REQUIREMENTS:
   ## Closing Questions
   ## Close-down & Next Steps
   ## Scoring Rubric
-- For the five “question” sections (Core/Competency/Technical/Culture & Values/Closing), format each question block as:
-  ### {Question text}
+- For each of the five “question” sections (Core/Competency/Technical/Culture & Values/Closing), format each question block as:
+  ### {{Question text}}
   **Intent:** …
   **What good looks like:** …
   **Follow-ups:** …
-- Keep concise bullet lines for Housekeeping, Close-down & Next Steps, and Scoring Rubric (1–2 lines each item).
-- Content must be role-appropriate for {job_title} at level {level_code} and tailored for stage {stage}.
-- Match UK/US spelling if implied; bias-aware, inclusive language.
-- **Stage tailoring**:
-  * 1st Interview: high-level fit, motivation, role understanding, basic competencies; shorter question sets; ensure inclusive, welcoming tone.
-  * 2nd Interview: functional / technical deep-dive; require more evidence, complexity, and measurable outcomes.
-  * Panel Interview: cross-functional scenarios, stakeholder alignment, conflict/negotiation; emphasise breadth and collaboration.
-  * Final Interview: values alignment, long-term impact, leadership maturity, risk judgement; ensure questions distinguish top-tier candidates.
-- Include:
-  1) At-a-glance overview
-  2) Interview structure (stages, durations, assessors, what to probe)
-  3) For each competency: 4–8 behavioural questions (escalate depth appropriately for {level_code}) + probing follow-ups
-  4) Role-type extras: if People Manager, leadership/coaching/performance/hiring/org health; if IC, depth/autonomy/impact
-  5) A clear 1–5 evaluation rubric with behavioural anchors per competency
-- Match UK/US spelling to location if implied; avoid internal system names unless vital.
+- Keep concise bullet lines for Housekeeping, Close-down & Next Steps, and Scoring Rubric.
+- Calibrate question depth to level {level_code} and tailor content for stage {stage}.
+- Match UK/US spelling if implied; avoid internal system names unless vital.
 """
+
     with st.spinner("Assembling your guide…"):
         guide_md = chat_complete(
             model,
@@ -183,14 +179,18 @@ REQUIREMENTS:
             max_tokens=max_tokens
         )
 
-    st.markdown("### Output")
-    st.code(guide_md, language="markdown")  # built-in copy button
+    st.markdown("### Preview (Markdown)")
+    st.code(guide_md, language="markdown")
 
+    # Word download (boxed layout, fixed sections, Neogen branding)
     st.download_button(
         "Download as .docx",
-        data=interview_to_docx_bytes(guide_md, job_title=job_title, stage=stage, duration=length),
-        file_name=f"{job_title.replace(' ', '_')}_Interview_Guide.docx",
+        data=interview_pack_to_docx_bytes(
+            guide_md,
+            job_title=job_title,
+            interview_type="Competency",
+            duration=length
+        ),
+        file_name=f"{job_title.replace(' ', '_')}_Interview_Pack.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
-
-
