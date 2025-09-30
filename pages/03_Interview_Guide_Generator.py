@@ -19,30 +19,23 @@ st.caption("Consistent, fast, and high-quality HR workflows.")
 st.caption(BUILD_INFO)
 
 # ---------------------------------------------------------------------
-# Tolerant wrapper for different chat_complete signatures
-def _run_llm(prompt_text: str) -> str:
-    try:
-        return chat_complete(prompt_text, max_tokens=1800)
-    except TypeError:
-        try:
-            return chat_complete(prompt=prompt_text, max_tokens=1800)
-        except TypeError:
-            msgs = [{"role": "user", "content": prompt_text}]
-            def _run_llm(prompt: str) -> str:
-    # Build your messages list like you already do:
-    msgs = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": prompt},
-    ]
 
-    # Call the LLM helper, but be compatible with both signatures:
-    from utils.llm import chat_complete
+# --- LLM glue (robust to either helper signature) ---------------------------
+from utils.llm import chat_complete
+
+def _run_llm(user_prompt: str) -> str:
+    """Return model text for the given prompt. Tries messages= first, falls back to prompt=."""
+    msgs = [
+        {"role": "system", "content": SYSTEM_PROMPT if "SYSTEM_PROMPT" in globals() else ""},
+        {"role": "user", "content": user_prompt},
+    ]
     try:
-        # New-style helper that accepts messages=
+        # Newer helper that accepts messages=
         return chat_complete(messages=msgs, max_tokens=1800)
     except TypeError:
-        # Old-style helper that expects a single prompt string
-        joined = f"{SYSTEM_PROMPT}\n\n{prompt}"
+        # Older helper that expects a single prompt string
+        sys = (SYSTEM_PROMPT if "SYSTEM_PROMPT" in globals() else "").strip()
+        joined = f"{sys}\n\n{user_prompt}" if sys else user_prompt
         return chat_complete(joined, max_tokens=1800)
 
 
@@ -200,3 +193,4 @@ try:
 except Exception as _e:
     pass
 # === END NEOGEN BOXED DOCX DOWNLOAD ===
+
