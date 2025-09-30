@@ -1,51 +1,31 @@
-﻿import os
-from typing import List, Dict, Any, Optional
+﻿# utils/llm.py
+import os
+import streamlit as st
+from openai import OpenAI
 
-def _get_api_key() -> Optional[str]:
-    # Prefer Streamlit secrets if available
-    try:
-        import streamlit as st
-        key = st.secrets.get("OPENAI_API_KEY", None)
-        if key:
-            return str(key)
-    except Exception:
-        pass
-    # Fallback to env var
-    return os.getenv("OPENAI_API_KEY")
-
-def chat_complete(model: str, messages: List[Dict[str, str]], temperature: float = 0.2, max_tokens: int = 1500) -> str:
+def chat_complete(prompt: str, *, max_tokens: int = 1800, system: str | None = None, temperature: float | None = None) -> str:
     """
-    Adapter that tries the new OpenAI SDK first (client.chat.completions.create),
-    then falls back to legacy openai.ChatCompletion.create if needed.
+    Unified wrapper for Chat Completions:
+      - prompt: plain string
+      - system: optional system string
+      - returns assistant text
     """
-    api_key = _get_api_key()
-    if not api_key:
-        return "[ERROR] No OpenAI API key found. Add it to .streamlit/secrets.toml (OPENAI_API_KEY) or as env var."
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    # try a few likely places for model/temp set in your app
+    model = (st.session_state.get("openai_model")
+             or st.session_state.get("model")
+             or "gpt-4o-mini")
+    temp = temperature if temperature is not None else float(st.session_state.get("temperature", 0.2))
 
-    # New SDK path
-    try:
-        from openai import OpenAI
-        client = OpenAI(api_key=api_key)
-        resp = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        return resp.choices[0].message.content
-    except Exception:
-        pass
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    messages.append({"role": "user", "content": prompt})
 
-    # Legacy SDK path
-    try:
-        import openai
-        openai.api_key = api_key
-        resp = openai.ChatCompletion.create(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        return resp["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"[ERROR] OpenAI call failed: {e}"
+    resp = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        temperature=temp,
+        max_tokens=max_tokens
+    )
+    return resp.choices[0].message.content.strip()
