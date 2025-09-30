@@ -1,1 +1,1 @@
-﻿BUILD 51280ef @ 2025-09-30 14:43:08 (boxed-docx)
+﻿BUILD cdfcc60 @ 2025-09-30 14:53:42 (llm-adapter)
