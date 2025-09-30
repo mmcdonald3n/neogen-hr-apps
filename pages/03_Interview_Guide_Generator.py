@@ -1,10 +1,24 @@
 ﻿import streamlit as st
 try:
+    from utils.branding import header
+except Exception:
+    # Fallback so the app runs even if branding.header isn't present
+    def header(text: str):
+        import streamlit as st
+        st.header(text)
+try:
     from utils.branding import inject_css
 except Exception:
     # Fallback: minimal top padding so the header doesn't overlap
     def inject_css():
         import streamlit as st
+try:
+    from utils.branding import header
+except Exception:
+    # Fallback so the app runs even if branding.header isn't present
+    def header(text: str):
+        import streamlit as st
+        st.header(text)
         st.markdown(
             "<style>.main > div:first-child{padding-top:1rem}</style>",
             unsafe_allow_html=True
@@ -121,5 +135,6 @@ st.download_button(
     file_name=f"{job_title.replace(' ','_')}_Interview_Pack.docx",
     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 )
+
 
 
