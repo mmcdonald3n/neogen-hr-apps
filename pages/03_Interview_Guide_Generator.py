@@ -1,156 +1,159 @@
-﻿import streamlit as st
-try:
-    from utils.branding import header
-except Exception:
-    # Fallback so the app runs even if branding.header isn't present
-    def header(text: str):
-        import streamlit as st
-        st.header(text)
-try:
-    from utils.branding import inject_css
-except Exception:
-    # Fallback: minimal top padding so the header doesn't overlap
-    def inject_css():
-        import streamlit as st
-try:
-    from utils.branding import header
-except Exception:
-    # Fallback so the app runs even if branding.header isn't present
-    def header(text: str):
-        import streamlit as st
-        st.header(text)
-        st.markdown(
-            "<style>.main > div:first-child{padding-top:1rem}</style>",
-            unsafe_allow_html=True
-        )
-from utils.exporters import interview_pack_to_docx_bytes as markdown_to_docx_bytes
+﻿import re
+import streamlit as st
+
+# --- Branding / utils ---
+from utils.branding import header, inject_css
 from utils.parsers import extract_text
 from utils.llm import chat_complete
 from utils.exporters import markdown_to_docx_bytes
-from utils.exporters import interview_pack_to_docx_bytes
-def _run_llm(prompt_text: str) -> str:
-    \"\"\"Be tolerant to different chat_complete signatures across branches.\"\"\"
-    try:
-        # most branches: chat_complete(prompt, max_tokens=...)
-        return chat_complete(prompt_text, max_tokens=1800)
-    except TypeError:
-        try:
-            # some wrappers: chat_complete(prompt=..., max_tokens=...)
-            return chat_complete(prompt=prompt_text, max_tokens=1800)
-        except TypeError:
-            # message-style: chat_complete(messages=[...], max_tokens=...)
-            msgs = [ { "role": "user", "content": prompt_text } ]
-            return chat_complete(messages=msgs, max_tokens=1800)
 
-
-st.set_page_config(page_title="Interview Guide Generator", layout="wide")
+# ---------------------------------------------------------------------
+# Page config must be first Streamlit call:
+st.set_page_config(page_title="Interview Guide Generator", layout="centered")
 inject_css()
 header("Interview Guide Generator")
 
-# --- Controls ---
+BUILD_INFO = "This page generates a Neogen-branded interview guide and exports to Word (.docx)."
+
+st.caption("Consistent, fast, and high-quality HR workflows.")
+st.caption(BUILD_INFO)
+
+# ---------------------------------------------------------------------
+# Tolerant wrapper for different chat_complete signatures
+def _run_llm(prompt_text: str) -> str:
+    try:
+        return chat_complete(prompt_text, max_tokens=1800)
+    except TypeError:
+        try:
+            return chat_complete(prompt=prompt_text, max_tokens=1800)
+        except TypeError:
+            msgs = [{"role": "user", "content": prompt_text}]
+            return chat_complete(messages=msgs, max_tokens=1800)
+
+def _slugify(s: str) -> str:
+    s = s.strip().lower()
+    s = re.sub(r"[^a-z0-9]+", "-", s)
+    return s.strip("-") or "interview-guide"
+
+LEVELS = [
+    "S1 - Entry",
+    "S2 - Intermediate",
+    "S3 - Senior",
+    "S4 - Highly Skilled",
+    "S5 - Specialist",
+    "M1 - Supervisor",
+    "M2 - Sr Supervisor",
+    "M3 - Manager",
+    "M4 - Sr Manager",
+    "M5 - Director",
+    "M6 - Senior Director",
+]
+
+STAGES = ["First Interview", "Second Interview", "Panel Interview", "Final Interview"]
+LENGTHS = ["30 mins", "45 mins", "60 mins", "90 mins"]
+
 with st.form("ivg_form"):
-    col1, col2, col3 = st.columns([1.2,1,1])
+    col1, col2, col3 = st.columns([1.2, 1, 1])
     with col1:
         job_title = st.text_input("Job Title*", placeholder="e.g., IT Manager")
-        level = st.selectbox(
-            "Level",
-            ["S1 - Entry", "S2 - Intermediate", "S3 - Senior", "S4 - Highly Skilled",
-             "S5 - Specialist", "M1 - Supervisor", "M2 - Sr Supervisor", "M3 - Manager",
-             "M4 - Sr Manager", "M5 - Director", "M6 - Senior Director"],
-            index=2
-        )
     with col2:
-        stage = st.selectbox("Interview Stage", ["1st Interview", "2nd Interview", "Panel Interview", "Final Interview"], index=0)
-        length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
+        level = st.selectbox("Level", LEVELS, index=0)
     with col3:
-        tone = st.slider("Tone (professional ↔ friendly)", 0, 10, 5)
-        detail = st.slider("Detail (concise ↔ thorough)", 0, 10, 5)
+        stage = st.selectbox("Interview Stage", STAGES, index=0)
 
-    jd_file = st.file_uploader("Upload JD (optional)", type=["pdf","docx","txt"])
-    competencies = st.text_area("Key Competencies (optional, one per line)", help="Leave blank if you want the model to infer from the JD/title.")
-    notes = st.text_area("Customisation Notes (optional)")
+    col4, col5 = st.columns([1, 1])
+    with col4:
+        length = st.selectbox("Interview Length", LENGTHS, index=2)
+    with col5:
+        jd_file = st.file_uploader("Upload JD (optional)", type=["pdf","docx","txt"])
 
-    submitted = st.form_submit_button("Generate Guide")
+    comps = st.text_area("Key Competencies (optional, one per line)", height=120,
+                         placeholder="Ownership\nCollaboration\nCustomer focus")
+    notes = st.text_area("Customisation Notes (optional)", height=120,
+                         placeholder="Anything specific to include, tone, focus areas, etc.")
+    generate = st.form_submit_button("Generate Guide")
 
-def _read_jd(file):
-    if not file: 
-        return ""
-    try:
-        return extract_text(file)
-    except Exception:
-        return ""
-
-if submitted:
+if generate:
     if not job_title.strip():
-        st.warning("Please enter a Job Title.")
+        st.error("Please enter a Job Title.")
         st.stop()
 
-    jd_text = _read_jd(jd_file)
-    comp_lines = [c.strip() for c in competencies.splitlines() if c.strip()]
-    comp_block = "\\n".join(f"- {c}" for c in comp_lines) if comp_lines else "(Model to infer key competencies from JD/title.)"
+    jd_text = ""
+    if jd_file is not None:
+        try:
+            jd_text = extract_text(jd_file)
+        except Exception as e:
+            st.warning(f"Could not read the uploaded file ({e}). Continuing without it.")
 
-    prompt = f'''
-You are an expert HR interviewer. Create a structured **Interview Guide** for the role **{job_title}** at Neogen.
+    comp_list = [c.strip() for c in comps.splitlines() if c.strip()]
+    comp_block = "\\n".join(f"- {c}" for c in comp_list) if comp_list else "None provided"
 
-Context:
-- Level: {level}
-- Stage: {stage}
-- Interview length: {length}
-- Tone scale (0-10): {tone}
-- Detail scale (0-10): {detail}
-- Key Competencies (if any):
+    prompt = f"""
+You are an experienced HR interviewer at Neogen. Create a branded, structured interview guide
+for the role **{job_title}** at level **{level}**, for the **{stage}** lasting **{length}**.
+
+House style: concise, clear English, inclusive language; no jargon. Use headings and bullets.
+
+If the job description text below is present, use it as the source of truth; otherwise use best practice.
+Only include content that would be appropriate for {stage.lower()}.
+
+Job description (may be empty):
+\"\"\"{jd_text}\"\"\"
+
+Key competencies (optional):
 {comp_block}
 
-Job Description (if provided):
-\"\"\"{jd_text[:8000]}\"\"\"  # truncated for safety
+Customisation notes (optional):
+{notes}
 
-Output as well-structured **Markdown** with these sections and anchors:
-# Interview Guide — {job_title}
-## Overview
-- Purpose of this interview stage
-- What good looks like at {level} for this role
-- Interview logistics (duration {length}, panel guidance if applicable)
+Required output (Markdown):
 
-## Competency Questions
-Provide 6–10 competency-based questions aligned to competencies for this role.
-For each question include:
-- **Question**
-- **What to listen for** (bullets)
-- **Scoring rubric (1–5)** with concise behavioral anchors
+# Interview Agenda
+- Welcome & introductions (2–3 minutes)
+- Role overview & context (brief)
+- Structured question blocks (by competency or topic)
+- Candidate questions
+- Close & next steps
 
-## Role/Technical Questions
-Provide 4–8 role-specific questions with the same sub-structure as above.
+# Interview Questions
+For each topic/competency include:
+- **Purpose** (what we’re testing)
+- **Primary question**
+- **2–3 probing prompts**
+- **What good looks like** (scoring anchors 1–5: Poor, Needs Improvement, Satisfactory, Very Good, Excellent)
 
-## Candidate Questions
-3–5 thoughtful questions the candidate might ask.
+# Practical / Scenario (optional)
+One short scenario aligned to the role; include expected signals.
 
-## Closing & Next Steps
-- How to wrap the interview
-- What to tell the candidate about next steps
+# Evaluation Criteria
+- A short rubric for 1–5 across the main areas.
 
-Keep wording concise, inclusive, and plain-English. Avoid jargon.
-'''
+# Closing Script
+Brief, warm closing that thanks the candidate, explains next steps and timelines, and who to contact for questions.
+"""
 
-    with st.spinner("Creating guide..."):
+    with st.spinner("Generating interview guide…"):
         guide_md = _run_llm(prompt)
 
-    docx_bytes = interview_pack_to_docx_bytes(
-    guide_md=guide_md,
-    job_title=job_title or "Role",
-    stage=stage,          # e.g. "1st Interview"
-    level=level,          # e.g. "S1".."M6"
-    length=length,        # e.g. "60 mins"
-    logo_path="assets/neogen_logo.png",
-)
+    st.success("Guide generated.")
+    st.markdown(guide_md)
 
-st.download_button(
-    "Download as .docx",
-    data=docx_bytes,
-    file_name=f"{job_title.replace(' ','_')}_Interview_Pack.docx",
-    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-)
+    # Show a copy button (Streamlit code block provides a copy icon)
+    with st.expander("Copy the Markdown"):
+        st.code(guide_md, language="markdown")
 
+    # Export to DOCX
+    try:
+        docx_bytes = markdown_to_docx_bytes(guide_md, filename_title=job_title)
+    except TypeError:
+        # Fallback if exporter signature differs on this branch
+        docx_bytes = markdown_to_docx_bytes(guide_md)
 
-
-
-
+    file_name = f"{_slugify(job_title)}-interview-guide.docx"
+    st.download_button(
+        "Download as .docx",
+        data=docx_bytes,
+        file_name=file_name,
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        type="primary",
+    )
