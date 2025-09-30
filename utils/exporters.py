@@ -1,5 +1,16 @@
 ﻿from io import BytesIO
 from pathlib import Path
+
+SECTION_ORDER = [
+    "Housekeeping",
+    "Core Questions",
+    "Competency Questions",
+    "Technical Questions",
+    "Culture & Values",
+    "Closing Questions",
+    "Close-down & Next Steps",
+    "Scoring Rubric",
+]
 from typing import List
 import re
 import unicodedata
@@ -191,6 +202,17 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from pathlib import Path
+
+SECTION_ORDER = [
+    "Housekeeping",
+    "Core Questions",
+    "Competency Questions",
+    "Technical Questions",
+    "Culture & Values",
+    "Closing Questions",
+    "Close-down & Next Steps",
+    "Scoring Rubric",
+]
 import re
 
 def _add_logo_header_footer(doc: Document, logo_path: str, footer_text: str = "Powered by Neogen HR"):
@@ -389,6 +411,17 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from pathlib import Path
+
+SECTION_ORDER = [
+    "Housekeeping",
+    "Core Questions",
+    "Competency Questions",
+    "Technical Questions",
+    "Culture & Values",
+    "Closing Questions",
+    "Close-down & Next Steps",
+    "Scoring Rubric",
+]
 import re
 
 # Reuse helpers if present; else define light ones
@@ -527,7 +560,11 @@ def interview_pack_to_docx_bytes(
     doc.add_paragraph("")
 
     # Iterate sections in fixed order
-    for name in SECTION_ORDER:
+    section_order = SECTION_ORDER if "SECTION_ORDER" in globals() else [
+    "Housekeeping","Core Questions","Competency Questions","Technical Questions",
+    "Culture & Values","Closing Questions","Close-down & Next Steps","Scoring Rubric"
+]
+for name in section_order:
         body = _extract_section(md, name)
         if not body: 
             continue
@@ -549,4 +586,5 @@ def interview_pack_to_docx_bytes(
     bio = BytesIO()
     doc.save(bio)
     return bio.getvalue()
+
 
