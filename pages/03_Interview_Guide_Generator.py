@@ -1,5 +1,5 @@
 ﻿import streamlit as st
-from utils.branding import header, inject_css
+from utils.exporters import interview_pack_to_docx_bytes as markdown_to_docx_bytes
 from utils.parsers import extract_text
 from utils.llm import chat_complete
 from utils.exporters import markdown_to_docx_bytes
