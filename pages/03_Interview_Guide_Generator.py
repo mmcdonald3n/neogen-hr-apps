@@ -5,7 +5,7 @@ import re
 from utils.branding import header, sidebar_model_controls, inject_css
 from utils.llm import chat_complete
 from utils.parsers import extract_text_from_upload
-from utils.exporters import interview_to_docx_bytes
+from utils.exporters import interview_pack_to_docx_bytes
 
 st.set_page_config(page_title="Interview Guide / Question Generator", page_icon="🧩", layout="wide")
 inject_css()
@@ -59,10 +59,12 @@ with st.form("ivq_form"):
         level_code = st.selectbox("Level*", LEVELS, index=5)  # default M1-ish
     with c3:
         role_type = st.selectbox("Role Type*", ["Individual Contributor", "People Manager"])
+    interview_type = st.selectbox("Interview Type*", ["Competency"], index=0)
 
     c4, c5, c6 = st.columns([2,2,2])
     with c4:
         stage = st.selectbox("Interview Stage*", STAGES)
+    length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
     length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
     with c5:
         tone = st.slider("Tone", 0, 10, 5, help="Plain → Formal")
@@ -143,7 +145,23 @@ SOURCE_JD (optional, extracted text):
 \"\"\"{(source_text or "")[:20000]}\"\"\"
 
 REQUIREMENTS:
-- Produce a complete Neogen-style interview guide in Markdown.
+- Produce a complete Neogen-style interview pack in Markdown using EXACT SECTION HEADINGS in this order:
+  ## Housekeeping
+  ## Core Questions
+  ## Competency Questions
+  ## Technical Questions
+  ## Culture & Values
+  ## Closing Questions
+  ## Close-down & Next Steps
+  ## Scoring Rubric
+- For the five “question” sections (Core/Competency/Technical/Culture & Values/Closing), format each question block as:
+  ### {Question text}
+  **Intent:** …
+  **What good looks like:** …
+  **Follow-ups:** …
+- Keep concise bullet lines for Housekeeping, Close-down & Next Steps, and Scoring Rubric (1–2 lines each item).
+- Content must be role-appropriate for {job_title} at level {level_code} and tailored for stage {stage}.
+- Match UK/US spelling if implied; bias-aware, inclusive language.
 - **Stage tailoring**:
   * 1st Interview: high-level fit, motivation, role understanding, basic competencies; shorter question sets; ensure inclusive, welcoming tone.
   * 2nd Interview: functional / technical deep-dive; require more evidence, complexity, and measurable outcomes.
@@ -174,4 +192,5 @@ REQUIREMENTS:
         file_name=f"{job_title.replace(' ', '_')}_Interview_Guide.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+
 
