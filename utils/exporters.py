@@ -238,18 +238,48 @@ def _section_chip(doc: Document, text: str):
     for r in h.runs: r.font.size = Pt(14)
     _h_rule(doc.add_paragraph(""))
 
-def _card(doc: Document, lines: list[str]):
-    # Single-cell table used as a "box"
+def _card(doc: Document, question: str, intent: str, good: str, follow: str):
     tbl = doc.add_table(rows=1, cols=1)
+    # Prefer a built-in bordered style if available
+    try:
+        tbl.style = "Table Grid"
+    except Exception:
+        pass
     cell = tbl.rows[0].cells[0]
-    # light border & padding via paragraph spacing
+    # Hard borders as a guarantee regardless of theme
+    _set_cell_border(
+        cell,
+        top={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+        left={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+        bottom={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+        right={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+    )
     p = cell.paragraphs[0]
-    for ln in lines:
-        run = p.add_run(ln + "\n")
-        run.font.size = Pt(11)
-    # Add a blank paragraph after the box
-    doc.add_paragraph("")
+    p.paragraph_format.space_after = Pt(6)
 
+    # Question (bold)
+    qtext = (question or "").strip()
+    if qtext:
+        rq = p.add_run(qtext)
+        rq.font.size = Pt(12)
+        rq.bold = True
+        p.add_run("\\n")
+
+    if intent:
+        ri = p.add_run("Intent: ")
+        ri.bold = True; ri.font.size = Pt(11)
+        p.add_run(intent + "\\n").font.size = Pt(11)
+    if good:
+        rg = p.add_run("What good looks like: ")
+        rg.bold = True; rg.font.size = Pt(11)
+        p.add_run(good + "\\n").font.size = Pt(11)
+    if follow:
+        rf = p.add_run("Follow-ups: ")
+        rf.bold = True; rf.font.size = Pt(11)
+        p.add_run(follow).font.size = Pt(11)
+
+    # Extra whitespace after the box
+    doc.add_paragraph("")
 def _split_questions(md: str):
     # Very forgiving splitter: looks for lines that start with a question-ish header or bold "Q"
     blocks = []
@@ -432,36 +462,46 @@ def _parse_block(block: str):
 
 def _card(doc: Document, question: str, intent: str, good: str, follow: str):
     tbl = doc.add_table(rows=1, cols=1)
+    # Prefer a built-in bordered style if available
+    try:
+        tbl.style = "Table Grid"
+    except Exception:
+        pass
     cell = tbl.rows[0].cells[0]
+    # Hard borders as a guarantee regardless of theme
+    _set_cell_border(
+        cell,
+        top={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+        left={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+        bottom={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+        right={"val":"single","sz":"12","color":"9CA3AF","space":"0"},
+    )
     p = cell.paragraphs[0]
-    # Question line (bold-ish)
-    rq = p.add_run((question or "").strip())
-    rq.font.size = Pt(12); rq.bold = True
-    p.add_run("\n")
+    p.paragraph_format.space_after = Pt(6)
+
+    # Question (bold)
+    qtext = (question or "").strip()
+    if qtext:
+        rq = p.add_run(qtext)
+        rq.font.size = Pt(12)
+        rq.bold = True
+        p.add_run("\\n")
 
     if intent:
-        ri = p.add_run("Intent: "); ri.bold = True; ri.font.size = Pt(11)
-        p.add_run(intent + "\n").font.size = Pt(11)
+        ri = p.add_run("Intent: ")
+        ri.bold = True; ri.font.size = Pt(11)
+        p.add_run(intent + "\\n").font.size = Pt(11)
     if good:
-        rg = p.add_run("What good looks like: "); rg.bold = True; rg.font.size = Pt(11)
-        p.add_run(good + "\n").font.size = Pt(11)
+        rg = p.add_run("What good looks like: ")
+        rg.bold = True; rg.font.size = Pt(11)
+        p.add_run(good + "\\n").font.size = Pt(11)
     if follow:
-        rf = p.add_run("Follow-ups: "); rf.bold = True; rf.font.size = Pt(11)
+        rf = p.add_run("Follow-ups: ")
+        rf.bold = True; rf.font.size = Pt(11)
         p.add_run(follow).font.size = Pt(11)
 
+    # Extra whitespace after the box
     doc.add_paragraph("")
-
-SECTION_ORDER = [
-    "Housekeeping",
-    "Core Questions",
-    "Competency Questions",
-    "Technical Questions",
-    "Culture & Values",
-    "Closing Questions",
-    "Close-down & Next Steps",
-    "Scoring Rubric",
-]
-
 def _extract_section(md: str, name: str) -> str:
     # Grab content under "## {name}" up to the next "##"
     pat = rf'(?is)^\s*##\s*{re.escape(name)}\s*\n(.*?)(?=^\s*##\s|\Z)'
@@ -509,3 +549,4 @@ def interview_pack_to_docx_bytes(
     bio = BytesIO()
     doc.save(bio)
     return bio.getvalue()
+
