@@ -156,7 +156,8 @@ Brief, warm closing that thanks the candidate, explains next steps and timelines
         docx_bytes = markdown_to_docx_bytes(guide_md, filename_title=job_title)
     except TypeError:
         # Fallback if exporter signature differs on this branch
-        docx_bytes = markdown_to_docx_bytes(guide_md)
+        guide_md_text = "\n\n".join(guide_md) if isinstance(guide_md, (list, tuple)) else str(guide_md)
+docx_bytes = markdown_to_docx_bytes(guide_md_text, filename_title=job_title)
 
     file_name = f"{_slugify(job_title)}-interview-guide.docx"
     st.download_button(
@@ -215,5 +216,6 @@ def _robust_run_llm(user_prompt: str) -> str:
             # Oldest: positional only
             return chat_complete(joined, 1800)
 # --- end injected -----------------------------------------------------------
+
 
 
