@@ -1,7 +1,7 @@
 ﻿import streamlit as st
 from utils.branding import header, sidebar_model_controls, inject_css
 from utils.llm import chat_complete
-from utils.parsers import extract_text
+from utils.parsers import extract_text_from_upload
 
 st.set_page_config(page_title="Interview Guide Generator", page_icon="📋", layout="wide")
 inject_css()
@@ -25,7 +25,7 @@ with st.form("ivg_form"):
     submitted = st.form_submit_button("Generate Interview Guide")
 
 if submitted:
-    jd_text = extract_text(jd_file) if jd_file else ""
+    jd_text = extract_text_from_upload(jd_file) if jd_file else ""
     system = "You produce structured interview guides with sections, suggested timings, and evaluation rubrics."
     user = f"""
 JOB_TITLE: {job_title}
@@ -54,3 +54,4 @@ Format in Markdown, concise and practical.
     st.markdown("### Output")
     st.download_button("Download as .md", data=out.encode("utf-8"), file_name=f"{job_title or 'role'}_Interview_Guide.md", mime="text/markdown")
     st.markdown(out)
+
