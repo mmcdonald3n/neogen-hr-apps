@@ -1,8 +1,109 @@
-# -*- coding: utf-8 -*-
-import streamlit as st
+﻿import streamlit as st
 from utils.branding import header, inject_css
+from utils.parsers import extract_text
+from utils.llm import chat_complete
+from utils.exporters import markdown_to_docx_bytes
 
-st.set_page_config(page_title="Interview Guide Generator", page_icon="🧩")
-header("Interview Guide Generator")
+st.set_page_config(page_title="Interview Guide Generator", layout="wide")
 inject_css()
-st.success("Header loaded cleanly. If you see this, the indentation issue is gone.")
+header("Interview Guide Generator")
+
+# --- Controls ---
+with st.form("ivg_form"):
+    col1, col2, col3 = st.columns([1.2,1,1])
+    with col1:
+        job_title = st.text_input("Job Title*", placeholder="e.g., IT Manager")
+        level = st.selectbox(
+            "Level",
+            ["S1 - Entry", "S2 - Intermediate", "S3 - Senior", "S4 - Highly Skilled",
+             "S5 - Specialist", "M1 - Supervisor", "M2 - Sr Supervisor", "M3 - Manager",
+             "M4 - Sr Manager", "M5 - Director", "M6 - Senior Director"],
+            index=2
+        )
+    with col2:
+        stage = st.selectbox("Interview Stage", ["1st Interview", "2nd Interview", "Panel Interview", "Final Interview"], index=0)
+        length = st.selectbox("Interview Length", ["30 mins","45 mins","60 mins","90 mins"], index=2)
+    with col3:
+        tone = st.slider("Tone (professional ↔ friendly)", 0, 10, 5)
+        detail = st.slider("Detail (concise ↔ thorough)", 0, 10, 5)
+
+    jd_file = st.file_uploader("Upload JD (optional)", type=["pdf","docx","txt"])
+    competencies = st.text_area("Key Competencies (optional, one per line)", help="Leave blank if you want the model to infer from the JD/title.")
+    notes = st.text_area("Customisation Notes (optional)")
+
+    submitted = st.form_submit_button("Generate Guide")
+
+def _read_jd(file):
+    if not file: 
+        return ""
+    try:
+        return extract_text(file)
+    except Exception:
+        return ""
+
+if submitted:
+    if not job_title.strip():
+        st.warning("Please enter a Job Title.")
+        st.stop()
+
+    jd_text = _read_jd(jd_file)
+    comp_lines = [c.strip() for c in competencies.splitlines() if c.strip()]
+    comp_block = "\\n".join(f"- {c}" for c in comp_lines) if comp_lines else "(Model to infer key competencies from JD/title.)"
+
+    prompt = f'''
+You are an expert HR interviewer. Create a structured **Interview Guide** for the role **{job_title}** at Neogen.
+
+Context:
+- Level: {level}
+- Stage: {stage}
+- Interview length: {length}
+- Tone scale (0-10): {tone}
+- Detail scale (0-10): {detail}
+- Key Competencies (if any):
+{comp_block}
+
+Job Description (if provided):
+\"\"\"{jd_text[:8000]}\"\"\"  # truncated for safety
+
+Output as well-structured **Markdown** with these sections and anchors:
+# Interview Guide — {job_title}
+## Overview
+- Purpose of this interview stage
+- What good looks like at {level} for this role
+- Interview logistics (duration {length}, panel guidance if applicable)
+
+## Competency Questions
+Provide 6–10 competency-based questions aligned to competencies for this role.
+For each question include:
+- **Question**
+- **What to listen for** (bullets)
+- **Scoring rubric (1–5)** with concise behavioral anchors
+
+## Role/Technical Questions
+Provide 4–8 role-specific questions with the same sub-structure as above.
+
+## Candidate Questions
+3–5 thoughtful questions the candidate might ask.
+
+## Closing & Next Steps
+- How to wrap the interview
+- What to tell the candidate about next steps
+
+Keep wording concise, inclusive, and plain-English. Avoid jargon.
+'''
+
+    with st.spinner("Creating guide..."):
+        guide_md = chat_complete(prompt, max_tokens=1800)
+
+    st.subheader("Preview")
+    st.markdown(guide_md)
+
+    # DOCX download
+    docx_bytes = markdown_to_docx_bytes(guide_md, filename_title=job_title)
+    st.download_button(
+        "Download as .docx",
+        data=docx_bytes,
+        file_name=f"Neogen_Interview_Guide_{job_title.replace(' ','_')}.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        use_container_width=True
+    )

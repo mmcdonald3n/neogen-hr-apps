@@ -61,3 +61,6 @@ a.tile, a.tile:visited, a.tile:active {
   .tile-grid { grid-template-columns: 1fr; }
   .tile.long { grid-column: 1 / span 1; }
 }
+/* header + page padding */
+div.block-container{padding-top:0.85rem;}
+.neogen-header{margin-top:0.25rem;}
