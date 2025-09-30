@@ -7,4 +7,5 @@ from utils.exporters import interview_pack_to_docx_bytes  # boxed DOCX
 
 st.set_page_config(page_title="Interview Guide Generator", page_icon="🧩")
 header("Interview Guide Generator")
-st.success("Page header loaded cleanly. Now restore the full body below this header.")
+inject_css()
+st.success("Header loaded cleanly. If you see this, the indentation error is gone.")
