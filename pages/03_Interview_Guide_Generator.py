@@ -28,6 +28,20 @@ from utils.parsers import extract_text
 from utils.llm import chat_complete
 from utils.exporters import markdown_to_docx_bytes
 from utils.exporters import interview_pack_to_docx_bytes
+def _run_llm(prompt_text: str) -> str:
+    \"\"\"Be tolerant to different chat_complete signatures across branches.\"\"\"
+    try:
+        # most branches: chat_complete(prompt, max_tokens=...)
+        return chat_complete(prompt_text, max_tokens=1800)
+    except TypeError:
+        try:
+            # some wrappers: chat_complete(prompt=..., max_tokens=...)
+            return chat_complete(prompt=prompt_text, max_tokens=1800)
+        except TypeError:
+            # message-style: chat_complete(messages=[...], max_tokens=...)
+            msgs = [ { "role": "user", "content": prompt_text } ]
+            return chat_complete(messages=msgs, max_tokens=1800)
+
 
 st.set_page_config(page_title="Interview Guide Generator", layout="wide")
 inject_css()
@@ -118,7 +132,7 @@ Keep wording concise, inclusive, and plain-English. Avoid jargon.
 '''
 
     with st.spinner("Creating guide..."):
-        guide_md = chat_complete(prompt, max_tokens=1800)
+        guide_md = _run_llm(prompt)
 
     docx_bytes = interview_pack_to_docx_bytes(
     guide_md=guide_md,
@@ -135,6 +149,7 @@ st.download_button(
     file_name=f"{job_title.replace(' ','_')}_Interview_Pack.docx",
     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 )
+
 
 
 
