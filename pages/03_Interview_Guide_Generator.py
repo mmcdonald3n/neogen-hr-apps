@@ -23,7 +23,7 @@ st.caption(BUILD_INFO)
 # --- LLM glue (robust to either helper signature) ---------------------------
 from utils.llm import chat_complete
 
-def _run_llm(user_prompt: str) -> str:
+def _robust_run_llm(user_prompt: str) -> str:
     """Return model text for the given prompt. Tries messages= first, falls back to prompt=."""
     msgs = [
         {"role": "system", "content": SYSTEM_PROMPT if "SYSTEM_PROMPT" in globals() else ""},
@@ -142,7 +142,7 @@ Brief, warm closing that thanks the candidate, explains next steps and timelines
 """
 
     with st.spinner("Generating interview guide…"):
-        guide_md = _run_llm(prompt)
+        guide_md = _robust_run_llm(prompt)
 
     st.success("Guide generated.")
     st.markdown(guide_md)
@@ -193,4 +193,26 @@ try:
 except Exception as _e:
     pass
 # === END NEOGEN BOXED DOCX DOWNLOAD ===
+
+
+# --- injected robust llm wrapper (auto) -------------------------------------
+def _robust_run_llm(user_prompt: str) -> str:
+    msgs = [
+        {"role": "system", "content": (SYSTEM_PROMPT if "SYSTEM_PROMPT" in globals() else "")},
+        {"role": "user", "content": user_prompt},
+    ]
+    try:
+        # Newer helper that accepts messages=
+        return chat_complete(messages=msgs, max_tokens=1800)
+    except TypeError:
+        # Fallback to helpers that want a single prompt string
+        sys = (SYSTEM_PROMPT if "SYSTEM_PROMPT" in globals() else "").strip()
+        joined = (sys + "\\n\\n" + user_prompt) if sys else user_prompt
+        try:
+            # Some helpers require prompt= keyword
+            return chat_complete(prompt=joined, max_tokens=1800)
+        except TypeError:
+            # Oldest: positional only
+            return chat_complete(joined, 1800)
+# --- end injected -----------------------------------------------------------
 
